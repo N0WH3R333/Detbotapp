@@ -246,6 +246,9 @@
         const tg = window.Telegram.WebApp;
         tg.expand(); // Раскрываем Web App на весь экран
 
+        // Указываем постоянный адрес вашего бэкенда на Render
+        const API_BASE_URL = 'https://btdetailing.onrender.com';
+
         let productsData = {};
         let cart = {};
         let appliedPromo = { code: null, discount: 0 };
@@ -269,7 +272,7 @@
             categoriesContainer.innerHTML = '<p style="text-align: center; color: var(--tg-theme-hint-color);">Загрузка каталога...</p>';
             try {
                 // Добавляем no-cache, чтобы всегда получать свежие данные
-                const response = await fetch(`/api/products`, { cache: 'no-cache' });
+                const response = await fetch(`${API_BASE_URL}/api/products`, { cache: 'no-cache' });
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
@@ -403,7 +406,7 @@
             }
 
             try {
-                const response = await fetch(`/api/validate_promocode?code=${code}`);
+                const response = await fetch(`${API_BASE_URL}/api/validate_promocode?code=${code}`);
                 const data = await response.json();
 
                 if (data.valid) {

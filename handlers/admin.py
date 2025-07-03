@@ -64,15 +64,16 @@ class AdminStates(StatesGroup):
     editing_order = State()
 
 # Этот фильтр будет пропускать только администратора
-try:
-    # Пытаемся преобразовать ADMIN_ID в число.
-    # Если переменная не задана или имеет неверный формат, фильтр не будет применен.
-    admin_id_int = int(ADMIN_ID)
-    router.message.filter(F.from_user.id == admin_id_int)
-    router.callback_query.filter(F.from_user.id == admin_id_int)
-    logger.info(f"Admin filter enabled for user ID: {admin_id_int}")
-except (ValueError, TypeError):
-    logger.warning("ADMIN_ID is not set or has an invalid format. Admin commands will be disabled.")
+if ADMIN_ID:
+    try:
+        # Пытаемся преобразовать ADMIN_ID в число.
+        # Если переменная не задана или имеет неверный формат, фильтр не будет применен.
+        admin_id_int = int(ADMIN_ID)
+        router.message.filter(F.from_user.id == admin_id_int)
+        router.callback_query.filter(F.from_user.id == admin_id_int)
+        logger.info(f"Admin filter enabled for user ID: {admin_id_int}")
+    except (ValueError, TypeError):
+        logger.warning("ADMIN_ID is not set or has an invalid format. Admin commands will be disabled.")
     
 
 # --- Вспомогательные функции ---
