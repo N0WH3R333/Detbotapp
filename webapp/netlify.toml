@@ -1,0 +1,5 @@
+# Правило перенаправления для API
+[[redirects]]
+  from = "/api/*"
+  to = "https://heavy-friends-help.loca.lt/:splat" # Этот URL мы будем менять
+  status = 200

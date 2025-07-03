@@ -1,0 +1,18 @@
+# Environments
+.env
+.env.local
+.venv
+venv/
+env/
+
+# IDE and OS files
+.vscode/
+.idea/
+__pycache__/
+
+# Local data storage
+data/
+
+# Log files
+logs/
+*.log
