@@ -14,8 +14,8 @@ from config import (
     BOT_TOKEN, LOG_LEVEL, LOG_LEVEL_HANDLERS, LOG_LEVEL_DATABASE,
     LOG_LEVEL_AIOGRAM, LOG_DIR, LOG_FILE, LOG_MAX_BYTES, LOG_BACKUP_COUNT
 )
-from handlers import common, booking, webapp_shop, admin # Убедитесь, что все импорты хендлеров на месте
-from database.db import init_db, get_all_promocodes, get_all_products
+from handlers import common, booking, webapp_shop, admin  # Убедитесь, что все импорты хендлеров на месте
+from database.db import get_all_promocodes, get_all_products
 from utils.bot_instance import bot_instance
 from middlewares.block_middleware import BlockMiddleware
 from utils.scheduler import scheduler, schedule_existing_reminders, schedule_reports
@@ -115,7 +115,6 @@ async def validate_promocode_handler(request: web.Request) -> web.Response:
 
 async def main() -> None:
     setup_logging()
-    await init_db() # Инициализируем новую базу данных
     logging.info("Запуск бота...")
 
     # Инициализация бота и диспетчера
