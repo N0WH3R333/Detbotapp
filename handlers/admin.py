@@ -1,12 +1,12 @@
 import asyncio
 import logging
 from datetime import datetime, timedelta
-import locale
 from collections import Counter
 import math
 import io
 import csv
 import json
+from babel.dates import format_date
 
 from aiogram import F, Router, Bot, types
 from aiogram.filters import Command
@@ -40,11 +40,6 @@ try:
 except ImportError:
     plt = None
 
-# Устанавливаем русскую локаль для красивого вывода месяцев
-try:
-    locale.setlocale(locale.LC_TIME, 'ru_RU.UTF-8')
-except locale.Error:
-    locale.setlocale(locale.LC_TIME, 'Russian')
 ADMIN_ITEMS_PER_PAGE = 5  # Количество элементов на странице в админке
 
 logger = logging.getLogger(__name__)
@@ -99,7 +94,7 @@ async def _get_filtered_bookings(period: str) -> tuple[list, str]:
             except (ValueError, KeyError):
                 continue
     elif period == "month":
-        title = f"Записи на {now.strftime('%B %Y г.')}"
+        title = f"Записи на {format_date(now, 'LLLL yyyy г.', locale='ru_RU')}"
         for booking in all_bookings:
             try:
                 booking_date = datetime.strptime(booking['date'], "%d.%m.%Y")
