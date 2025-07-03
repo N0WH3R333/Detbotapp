@@ -12,7 +12,8 @@ import json
 
 from config import (
     BOT_TOKEN, LOG_LEVEL, LOG_LEVEL_HANDLERS, LOG_LEVEL_DATABASE,
-    LOG_LEVEL_AIOGRAM, LOG_DIR, LOG_FILE, LOG_MAX_BYTES, LOG_BACKUP_COUNT
+    LOG_LEVEL_AIOGRAM, LOG_DIR, LOG_FILE, LOG_MAX_BYTES, LOG_BACKUP_COUNT,
+    WEBAPP_URL
 )
 from handlers import common, booking, webapp_shop, admin # Убедитесь, что все импорты хендлеров на месте
 from database.db import init_db, get_all_promocodes, get_all_products
@@ -62,7 +63,7 @@ async def products_api_handler(request: web.Request) -> web.Response:
     logger.debug("API request for products received.")
     # Устанавливаем заголовки для CORS, на случай если фронтенд будет на другом домене
     headers = {
-        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Origin": WEBAPP_URL or "*",
         "Access-Control-Allow-Methods": "GET, OPTIONS",
         "Access-Control-Allow-Headers": "Content-Type",
     }
@@ -78,7 +79,7 @@ async def validate_promocode_handler(request: web.Request) -> web.Response:
     promocode = request.query.get('code', '').upper()
     logger.debug(f"API request to validate promocode: {promocode}")
 
-    headers = {"Access-Control-Allow-Origin": "*"}
+    headers = {"Access-Control-Allow-Origin": WEBAPP_URL or "*"}
     promocodes_db = await get_all_promocodes()
     today = datetime.now().date()
 
