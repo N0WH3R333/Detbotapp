@@ -12,8 +12,7 @@ import json
 
 from config import (
     BOT_TOKEN, LOG_LEVEL, LOG_LEVEL_HANDLERS, LOG_LEVEL_DATABASE,
-    LOG_LEVEL_AIOGRAM, LOG_DIR, LOG_FILE, LOG_MAX_BYTES, LOG_BACKUP_COUNT,
-    WEBAPP_URL
+    LOG_LEVEL_AIOGRAM, LOG_DIR, LOG_FILE, LOG_MAX_BYTES, LOG_BACKUP_COUNT
 )
 from handlers import common, booking, webapp_shop, admin # Убедитесь, что все импорты хендлеров на месте
 from database.db import init_db, get_all_promocodes, get_all_products
