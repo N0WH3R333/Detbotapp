@@ -157,10 +157,12 @@ async def main() -> None:
         # Запускаем веб-сервер и поллинг одновременно
         runner = web.AppRunner(app)
         await runner.setup()
+        # Render и другие хостинги предоставляют порт через переменную окружения PORT
+        port = int(os.environ.get("PORT", 8080))
         # Укажите host и port, которые будут использоваться для WebApp
-        site = web.TCPSite(runner, host='0.0.0.0', port=8080)
+        site = web.TCPSite(runner, host='0.0.0.0', port=port)
         await site.start()
-        logging.info("Веб-сервер для WebApp и API запущен на http://0.0.0.0:8080")
+        logging.info(f"Веб-сервер для WebApp и API запущен на http://0.0.0.0:{port}")
         
         await bot.delete_webhook(drop_pending_updates=True)
         await dp.start_polling(bot)
