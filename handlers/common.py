@@ -120,7 +120,7 @@ async def cancel_my_booking(callback: CallbackQuery, callback_data: CancelBookin
     await callback.answer(f"Запись #{booking_id_to_cancel} отменена.")
 
 
-async def format_orders_page(orders_on_page: list[dict], all_products: dict) -> str:
+async def format_orders_page(orders_on_page: list[dict], all_products_dict: dict) -> str:
     """Форматирует текст для одной страницы истории заказов."""
     response_text = "<b>История ваших заказов:</b>\n\n"
     for order in orders_on_page:
@@ -132,7 +132,7 @@ async def format_orders_page(orders_on_page: list[dict], all_products: dict) -> 
         discount_amount = order.get("discount_amount", 0)
         address = order.get("address")
         for item_id, quantity in order['cart'].items():
-            product = all_products.get(item_id, {"name": "Неизвестный товар"})
+            product = all_products_dict.get(item_id, {"name": "Неизвестный товар"})
             response_text += f"  - {product['name']} x {quantity} шт.\n"
         if discount_amount > 0 and promocode:
             response_text += f"<i>Скидка по промокоду '{promocode}': -{discount_amount:.2f} руб.</i>\n"
@@ -158,9 +158,10 @@ async def show_my_orders(message: Message):
 
     page = 0
     # Загружаем все товары один раз перед форматированием
-    all_products = await get_all_products()
+    all_products_list = await get_all_products()
+    all_products_dict = {p['id']: p for p in all_products_list}
     total_pages = math.ceil(len(orders) / ORDERS_PER_PAGE)
-    text = await format_orders_page(orders[0:ORDERS_PER_PAGE], all_products)
+    text = await format_orders_page(orders[0:ORDERS_PER_PAGE], all_products_dict)
 
     await message.answer(text, reply_markup=get_orders_keyboard(page=page, total_pages=total_pages, orders_on_page=orders[0:ORDERS_PER_PAGE]))
 
@@ -172,12 +173,13 @@ async def paginate_orders(callback: CallbackQuery, callback_data: OrderPaginator
     orders = await get_user_orders(user_id=callback.from_user.id)
     orders.reverse()
     # Загружаем товары и здесь
-    all_products = await get_all_products()
+    all_products_list = await get_all_products()
+    all_products_dict = {p['id']: p for p in all_products_list}
 
     total_pages = math.ceil(len(orders) / ORDERS_PER_PAGE)
     start_index = page * ORDERS_PER_PAGE
     end_index = start_index + ORDERS_PER_PAGE
-    text = await format_orders_page(orders[start_index:end_index], all_products)
+    text = await format_orders_page(orders[start_index:end_index], all_products_dict)
 
     await callback.message.edit_text(text, reply_markup=get_orders_keyboard(page=page, total_pages=total_pages, orders_on_page=orders[start_index:end_index]))
     await callback.answer()
@@ -221,10 +223,11 @@ async def cancel_my_order(callback: CallbackQuery, callback_data: CancelOrder, b
         return
 
     page = 0
-    all_products = await get_all_products()
+    all_products_list = await get_all_products()
+    all_products_dict = {p['id']: p for p in all_products_list}
     total_pages = math.ceil(len(orders) / ORDERS_PER_PAGE)
     orders_on_page = orders[0:ORDERS_PER_PAGE]
-    text = await format_orders_page(orders_on_page, all_products)
+    text = await format_orders_page(orders_on_page, all_products_dict)
 
     try:
         await callback.message.edit_text(text, reply_markup=get_orders_keyboard(page=page, total_pages=total_pages, orders_on_page=orders_on_page))

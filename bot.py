@@ -20,6 +20,11 @@ from handlers import common, booking, webapp_shop, group_management, hiring, err
 from handlers.admin import admin_router
 from database.pool import get_pool, close_pool
 from database.db_setup import init_db
+from database.db import (
+    ensure_data_files_exist,
+    get_all_products,
+    get_all_promocodes
+)
 from utils.bot_instance import bot_instance
 from utils.constants import (CAR_SIZES, POLISHING_TYPES, CERAMICS_TYPES,
                              WRAPPING_TYPES, INTERIOR_TYPES, DIRT_LEVELS)
@@ -84,22 +89,19 @@ async def products_api_handler(request: web.Request) -> web.Response:
     # Логируем origin входящего запроса для отладки CORS
     origin = request.headers.get('Origin')
     logger.info(f"API request for products from origin: {origin}, method: {request.method}")
-    # TODO: Переписать эту функцию для получения данных из БД
-    from database.db import get_all_products # Временный импорт
 
     logger.info("Processing GET request for products.")
     all_products = await get_all_products()
-    # Добавляем логирование, чтобы видеть, сколько товаров загружено
-    logger.info(f"Loaded {len(all_products)} products from products.json.")
+    logger.info(f"Loaded {len(all_products)} products from the database.")
     if not all_products:
-        logger.warning("products.json is empty or could not be read. Returning empty catalog.")
+        logger.warning("Products table is empty or could not be read. Returning empty catalog.")
 
 
     # Динамическое построение категорий из данных в products.json
     # Структура: { "ИмяКатегории": { "subcategories": { "ИмяПодкатегории": { "products": [...] } } } }
     categories = {}
 
-    for product in all_products.values():
+    for product in all_products:
         # Используем .strip() для удаления случайных пробелов.
         category_name = product.get("category", "Без категории").strip()
         # Если подкатегория не указана, помещаем товар в подкатегорию "Основное"
@@ -164,8 +166,6 @@ async def validate_promocode_handler(request: web.Request) -> web.Response:
     promocode = request.query.get('code', '').upper()
     origin = request.headers.get('Origin')
     logger.debug(f"API request to validate promocode '{promocode}' from origin: {origin}, method: {request.method}")
-    # TODO: Переписать эту функцию для получения данных из БД
-    from database.db import get_all_promocodes # Временный импорт
 
     # Guard Clause: Промокод не предоставлен или не существует
     if not promocode or promocode not in (promocodes_db := await get_all_promocodes()):
@@ -212,6 +212,9 @@ async def main() -> None:
 
     # Инициализируем таблицы в базе данных
     await init_db()
+
+    # Наполняем БД начальными данными (товары) и создаем JSON-файлы
+    await ensure_data_files_exist()
 
     logging.info("Запуск бота...")
 

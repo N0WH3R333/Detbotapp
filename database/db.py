@@ -10,21 +10,15 @@ from .pool import get_pool
 logger = logging.getLogger(__name__)
 
 DATA_DIR = "data"
-BOOKINGS_FILE = os.path.join(DATA_DIR, "bookings.json")
-ORDERS_FILE = os.path.join(DATA_DIR, "orders.json")
 PRICES_FILE = os.path.join(DATA_DIR, "prices.json")
 
 # Асинхронная блокировка для предотвращения гонки данных при записи в файлы
 file_locks = {
-    BOOKINGS_FILE: asyncio.Lock(),
-    ORDERS_FILE: asyncio.Lock(),
     PRICES_FILE: asyncio.Lock(),
 }
 
 # Словарь для определения, какой пустой тип данных возвращать для каждого файла
 _DEFAULT_EMPTY_VALUES = {
-    BOOKINGS_FILE: [],
-    ORDERS_FILE: [],
     PRICES_FILE: {},
 }
 
@@ -74,10 +68,6 @@ async def ensure_data_files_exist():
     logger.info("Проверка и создание файлов данных...")
     os.makedirs(DATA_DIR, exist_ok=True)
 
-    if not os.path.exists(BOOKINGS_FILE):
-        await _write_data(BOOKINGS_FILE, [])
-    if not os.path.exists(ORDERS_FILE):
-        await _write_data(ORDERS_FILE, [])
     if not os.path.exists(PRICES_FILE):
         initial_prices = {
             "polishing": {
@@ -301,238 +291,374 @@ async def get_product_by_id(product_id: str) -> dict | None:
 
 # --- Функции для работы с записями (bookings) ---
 
-async def get_all_bookings() -> list[dict]:
-    """Загружает все записи на услуги из файла."""
-    return await _read_data(BOOKINGS_FILE)
+async def _format_booking_record(record: dict) -> dict:
+    """Вспомогательная функция для форматирования записи из БД в привычный dict."""
+    # Преобразуем asyncpg.Record в обычный словарь
+    booking = dict(record)
+    # Для совместимости с остальным кодом, который ожидает 'id', а не 'booking_id'
+    booking['id'] = booking['booking_id']
+    # Форматируем дату и время в строки, как было в JSON
+    if 'booking_date' in booking and booking['booking_date']:
+        booking['date'] = booking['booking_date'].strftime('%d.%m.%Y')
+    if 'booking_time' in booking and booking['booking_time']:
+        booking['time'] = booking['booking_time'].strftime('%H:%M')
+    # Распаковываем JSONB с деталями в основной словарь
+    if 'details_json' in booking and booking['details_json']:
+        # booking['details_json'] может быть строкой или уже dict
+        details = json.loads(booking['details_json']) if isinstance(booking['details_json'], str) else booking['details_json']
+        booking.update(details)
+    # Добавляем медиафайлы
+    if 'media_files' in booking and isinstance(booking['media_files'], str):
+        booking['media_files'] = json.loads(booking['media_files'])
+    elif 'media_files' not in booking:
+        booking['media_files'] = []
 
+    return booking
+
+async def get_all_bookings() -> list[dict]:
+    """Загружает все активные записи на услуги из базы данных."""
+    pool = await get_pool()
+    # Используем LEFT JOIN и агрегацию JSON, чтобы получить все медиафайлы одним запросом
+    sql = """
+        SELECT b.*, u.full_name as user_full_name, u.username as user_username,
+               COALESCE(
+                   (SELECT json_agg(json_build_object('type', bm.file_type, 'file_id', bm.file_id))
+                    FROM booking_media bm WHERE bm.booking_id = b.booking_id),
+                   '[]'::json
+               ) as media_files
+        FROM bookings b
+        JOIN users u ON b.user_id = u.user_id
+        WHERE b.status NOT IN ('cancelled_by_user', 'cancelled_by_admin', 'completed')
+        ORDER BY b.booking_date, b.booking_time;
+    """
+    async with pool.acquire() as connection:
+        records = await connection.fetch(sql)
+        return [await _format_booking_record(rec) for rec in records]
 
 async def get_user_bookings(user_id: int) -> list[dict]:
-    """Возвращает записи конкретного пользователя."""
-    all_bookings = await get_all_bookings()
-    return [b for b in all_bookings if b.get('user_id') == user_id]
-
+    """Возвращает все записи конкретного пользователя из БД."""
+    pool = await get_pool()
+    sql = """
+        SELECT b.*,
+               COALESCE(
+                   (SELECT json_agg(json_build_object('type', bm.file_type, 'file_id', bm.file_id))
+                    FROM booking_media bm WHERE bm.booking_id = b.booking_id),
+                   '[]'::json
+               ) as media_files
+        FROM bookings b
+        WHERE b.user_id = $1
+        ORDER BY b.created_at DESC;
+    """
+    async with pool.acquire() as connection:
+        records = await connection.fetch(sql, user_id)
+        return [await _format_booking_record(rec) for rec in records]
 
 async def add_booking_to_db(user_id: int, user_full_name: str, user_username: str | None, booking_data: dict) -> dict:
-    """Добавляет новую запись на услугу в файл."""
-    all_bookings = await get_all_bookings()
-    max_id = max((b.get('id', 0) for b in all_bookings), default=0)
-    new_booking = {
-        'id': max_id + 1,
-        'user_id': user_id,
-        'user_full_name': user_full_name,
-        'user_username': user_username,
-        **booking_data
-    }
-    all_bookings.append(new_booking)
-    await _write_data(BOOKINGS_FILE, all_bookings)
-    logger.info(f"User {user_id} created a new booking with ID {new_booking['id']}")
+    """Добавляет новую запись на услугу в базу данных."""
+    pool = await get_pool()
+    async with pool.acquire() as connection:
+        async with connection.transaction():
+            # 1. Убедимся, что пользователь существует
+            await connection.execute(
+                "INSERT INTO users (user_id, full_name, username) VALUES ($1, $2, $3) ON CONFLICT (user_id) DO UPDATE SET full_name = EXCLUDED.full_name, username = EXCLUDED.username;",
+                user_id, user_full_name, user_username
+            )
+
+            # 2. Добавляем основную запись
+            booking_sql = """
+                INSERT INTO bookings (user_id, service_name, booking_date, booking_time, price_rub, discount_rub, promocode, details_json)
+                VALUES ($1, $2, TO_DATE($3, 'DD.MM.YYYY'), $4, $5, $6, $7, $8)
+                RETURNING booking_id;
+            """
+            booking_id = await connection.fetchval(
+                booking_sql, user_id, booking_data['service'], booking_data['date'], booking_data['time'],
+                int(booking_data['price']), int(booking_data.get('discount_amount', 0)),
+                booking_data.get('promocode'), json.dumps(booking_data.get('details', {}))
+            )
+
+            # 3. Добавляем медиафайлы, если они есть
+            media_files = booking_data.get('media_files', [])
+            if media_files:
+                media_sql = "INSERT INTO booking_media (booking_id, file_id, file_type) VALUES ($1, $2, $3);"
+                media_data = [(booking_id, media['file_id'], media['type']) for media in media_files]
+                await connection.executemany(media_sql, media_data)
+
+    # Возвращаем созданную запись для дальнейшего использования (например, для уведомлений)
+    new_booking = {**booking_data, 'id': booking_id, 'user_id': user_id, 'user_full_name': user_full_name, 'user_username': user_username}
+    logger.info(f"User {user_id} created a new booking with ID {booking_id}")
     return new_booking
 
+def _format_order_record(record: dict) -> dict:
+    """Вспомогательная функция для форматирования записи заказа из БД в привычный dict."""
+    order = dict(record)
+    order['id'] = order['order_id']  # для совместимости
+
+    # Восстанавливаем корзину из агрегированного JSON
+    items_list = json.loads(order['items']) if isinstance(order['items'], str) else order['items']
+    order['cart'] = {item['product_id']: item['quantity'] for item in items_list}
+
+    # Для совместимости со старым кодом, который ожидает эти ключи
+    order['date'] = order['created_at'].strftime("%Y-%m-%d %H:%M:%S")
+    order['items_price'] = order.get('items_price_rub', 0)
+    order['delivery_cost'] = order.get('delivery_cost_rub', 0)
+    order['discount_amount'] = order.get('discount_rub', 0)
+    order['total_price'] = order.get('total_price_rub', 0)
+    order['address'] = order.get('shipping_address')
+
+    # Удаляем вспомогательные/дублирующиеся поля
+    del order['items']
+    del order['order_id']
+    del order['items_price_rub']
+    del order['delivery_cost_rub']
+    del order['discount_rub']
+    del order['total_price_rub']
+    del order['shipping_address']
+
+    return order
 
 async def get_user_orders(user_id: int) -> list[dict]:
-    """Возвращает заказы пользователя из "базы данных" (orders.json)."""
-    all_orders = await _read_data(ORDERS_FILE)
-    return [o for o in all_orders if o.get('user_id') == user_id]
-
+    """Возвращает все заказы конкретного пользователя из БД."""
+    pool = await get_pool()
+    sql = """
+        SELECT o.*,
+               COALESCE(
+                   (SELECT json_agg(json_build_object('product_id', oi.product_id, 'quantity', oi.quantity))
+                    FROM order_items oi WHERE oi.order_id = o.order_id),
+                   '[]'::json
+               ) as items
+        FROM orders o
+        WHERE o.user_id = $1
+        ORDER BY o.created_at DESC;
+    """
+    async with pool.acquire() as connection:
+        records = await connection.fetch(sql, user_id)
+        return [_format_order_record(rec) for rec in records]
 
 async def get_all_orders() -> list[dict]:
-    """Загружает все заказы из файла."""
-    return await _read_data(ORDERS_FILE)
-
+    """Загружает все заказы из базы данных."""
+    pool = await get_pool()
+    sql = """
+        SELECT o.*, u.full_name as user_full_name, u.username as user_username,
+               COALESCE(
+                   (SELECT json_agg(json_build_object('product_id', oi.product_id, 'quantity', oi.quantity, 'price_per_item', oi.price_per_item_rub))
+                    FROM order_items oi WHERE oi.order_id = o.order_id),
+                   '[]'::json
+               ) as items
+        FROM orders o
+        JOIN users u ON o.user_id = u.user_id
+        ORDER BY o.created_at DESC;
+    """
+    async with pool.acquire() as connection:
+        records = await connection.fetch(sql)
+        return [_format_order_record(rec) for rec in records]
 
 async def add_order_to_db(user_id: int, user_full_name: str, user_username: str | None, order_details: dict) -> dict:
-    """Добавляет новый заказ в "базу данных" (orders.json) и возвращает его."""
-    all_orders = await _read_data(ORDERS_FILE)
-    max_id = max((order.get('id', 0) for order in all_orders), default=0)
-    new_order_id = max_id + 1
+    """Добавляет новый заказ и его состав в базу данных в рамках одной транзакции."""
+    pool = await get_pool()
+    async with pool.acquire() as connection:
+        async with connection.transaction():
+            # 1. Убедимся, что пользователь существует
+            await connection.execute(
+                "INSERT INTO users (user_id, full_name, username) VALUES ($1, $2, $3) ON CONFLICT (user_id) DO UPDATE SET full_name = EXCLUDED.full_name, username = EXCLUDED.username;",
+                user_id, user_full_name, user_username
+            )
 
+            # 2. Добавляем основную информацию о заказе
+            order_sql = """
+                INSERT INTO orders (user_id, items_price_rub, delivery_cost_rub, discount_rub, total_price_rub, promocode, shipping_method, shipping_address)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                RETURNING order_id, created_at;
+            """
+            order_record = await connection.fetchrow(
+                order_sql, user_id, int(order_details['items_price']), int(order_details['delivery_cost']),
+                int(order_details['discount_amount']), int(order_details['total_price']),
+                order_details.get('promocode'), order_details.get('shipping_method'), order_details.get('address')
+            )
+            order_id = order_record['order_id']
+
+            # 3. Добавляем товары из корзины
+            cart = order_details.get('cart', {})
+            if cart:
+                # Получаем цены всех товаров в корзине одним запросом
+                product_ids = list(cart.keys())
+                products_in_cart = await connection.fetch("SELECT id, price FROM products WHERE id = ANY($1::text[])", product_ids)
+                prices_map = {p['id']: p['price'] for p in products_in_cart}
+
+                items_to_insert = []
+                for product_id, quantity in cart.items():
+                    price_per_item = prices_map.get(product_id, 0) # Цена на момент покупки
+                    items_to_insert.append((order_id, product_id, quantity, price_per_item))
+
+                items_sql = "INSERT INTO order_items (order_id, product_id, quantity, price_per_item_rub) VALUES ($1, $2, $3, $4);"
+                await connection.executemany(items_sql, items_to_insert)
+
+    # Формируем и возвращаем объект, совместимый со старым кодом
     new_order = {
-        "id": new_order_id,
-        "user_id": user_id,
-        "user_full_name": user_full_name,
-        "user_username": user_username,
-        "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "status": "В обработке",  # Добавляем статус по умолчанию
-        **order_details
+        "id": order_id, "user_id": user_id, "user_full_name": user_full_name,
+        "user_username": user_username, "date": order_record['created_at'].strftime("%Y-%m-%d %H:%M:%S"),
+        "status": "processing", **order_details
     }
-
-    all_orders.append(new_order)
-    await _write_data(ORDERS_FILE, all_orders)
-    logger.info(f"User {user_id} placed a new order with ID {new_order_id}")
+    logger.info(f"User {user_id} placed a new order with ID {order_id}")
     return new_order
 
-
 async def update_order_status(order_id: int, new_status: str) -> dict | None:
-    """Обновляет статус заказа по его ID и возвращает обновленный заказ."""
-    all_orders = await get_all_orders()
-    updated_order = None
-    
-    for order in all_orders:
-        if order.get('id') == order_id:
-            order['status'] = new_status
-            updated_order = order
-            break
-            
-    if updated_order:
-        await _write_data(ORDERS_FILE, all_orders)
+    """Обновляет статус заказа по его ID в БД и возвращает обновленный заказ."""
+    pool = await get_pool()
+    sql = "UPDATE orders SET status = $1 WHERE order_id = $2 RETURNING *;"
+    async with pool.acquire() as connection:
+        # Мы не можем использовать _format_order_record, т.к. он требует JOIN,
+        # а здесь простой UPDATE. Мы вернем базовые данные, админ-панель их обработает.
+        updated_record = await connection.fetchrow(sql, new_status, order_id)
+
+    if updated_record:
         logger.info(f"Admin updated status for order #{order_id} to '{new_status}'")
-        return updated_order
+        return dict(updated_record)
     else:
         logger.warning(f"Admin tried to update status for non-existent order #{order_id}")
         return None
 
-
 async def update_order_cart_and_prices(order_id: int, new_cart: dict, new_prices: dict) -> dict | None:
-    """Обновляет корзину и цены заказа по его ID."""
-    all_orders = await get_all_orders()
-    updated_order = None
+    """Обновляет корзину и цены заказа по его ID в БД в рамках транзакции."""
+    pool = await get_pool()
+    async with pool.acquire() as connection:
+        async with connection.transaction():
+            # 1. Обновляем цены в основной таблице
+            update_sql = """
+                UPDATE orders SET
+                    items_price_rub = $1,
+                    discount_rub = $2,
+                    total_price_rub = $3
+                WHERE order_id = $4
+                RETURNING *;
+            """
+            updated_record = await connection.fetchrow(
+                update_sql, int(new_prices['items_price']), int(new_prices['discount_amount']),
+                int(new_prices['total_price']), order_id
+            )
+            if not updated_record:
+                logger.warning(f"Admin tried to edit non-existent order #{order_id}")
+                return None
 
-    for order in all_orders:
-        if order.get('id') == order_id:
-            order['cart'] = new_cart
-            order['items_price'] = new_prices.get('items_price')
-            order['discount_amount'] = new_prices.get('discount_amount')
-            order['total_price'] = new_prices.get('total_price')
-            updated_order = order
-            break
+            # 2. Удаляем старые товары
+            await connection.execute("DELETE FROM order_items WHERE order_id = $1;", order_id)
 
-    if updated_order:
-        await _write_data(ORDERS_FILE, all_orders)
-        logger.info(f"Admin edited contents for order #{order_id}")
-        return updated_order
-    else:
-        logger.warning(f"Admin tried to edit non-existent order #{order_id}")
-        return None
+            # 3. Добавляем новые товары
+            if new_cart:
+                product_ids = list(new_cart.keys())
+                products_in_cart = await connection.fetch("SELECT id, price FROM products WHERE id = ANY($1::text[])", product_ids)
+                prices_map = {p['id']: p['price'] for p in products_in_cart}
+
+                items_to_insert = [
+                    (order_id, pid, qty, prices_map.get(pid, 0)) for pid, qty in new_cart.items()
+                ]
+                items_sql = "INSERT INTO order_items (order_id, product_id, quantity, price_per_item_rub) VALUES ($1, $2, $3, $4);"
+                await connection.executemany(items_sql, items_to_insert)
+
+    logger.info(f"Admin edited contents for order #{order_id}")
+    return dict(updated_record)
 
 async def cancel_booking_in_db(booking_id: int, user_id: int | None = None) -> dict | None:
     """
-    Удаляет запись по ID.
-    - Если user_id указан, проверяет, что запись принадлежит этому пользователю.
-    - Если user_id равен None (для админа), удаляет запись по booking_id без проверки владельца.
-    Возвращает удаленный объект записи в случае успеха, иначе None.
+    Отменяет запись, обновляя ее статус в БД.
+    - Если user_id указан, статус меняется на 'cancelled_by_user' и проверяется владелец.
+    - Если user_id равен None (для админа), статус меняется на 'cancelled_by_admin'.
+    Возвращает отмененный объект записи в случае успеха, иначе None.
     """
-    all_bookings = await get_all_bookings()
-    booking_to_cancel = None
+    pool = await get_pool()
+    new_status = 'cancelled_by_user' if user_id is not None else 'cancelled_by_admin'
+    
+    sql = "UPDATE bookings SET status = $1 WHERE booking_id = $2"
+    # Если отменяет пользователь, добавляем проверку, что он владелец записи
+    if user_id:
+        sql += " AND user_id = $3"
+    sql += " RETURNING *;"
 
-    # Находим запись для удаления
-    for booking in all_bookings:
-        if booking.get('id') == booking_id:
-            # Если удаляет пользователь, проверяем права
-            if user_id is not None and booking.get('user_id') != user_id:
-                continue
-            booking_to_cancel = booking
-            break
+    async with pool.acquire() as connection:
+        params = [new_status, booking_id]
+        if user_id:
+            params.append(user_id)
+        
+        cancelled_record = await connection.fetchrow(sql, *params)
 
-    if not booking_to_cancel:
+    if cancelled_record:
+        log_msg_user = f"user {user_id}" if user_id is not None else "admin"
+        logger.info(f"Booking {booking_id} was cancelled by {log_msg_user}. Status set to '{new_status}'.")
+        return await _format_booking_record(cancelled_record)
+    else:
         if user_id is not None:
             logger.warning(f"Attempt to cancel non-existent or foreign booking {booking_id} by user {user_id}.")
         else:
             logger.warning(f"Admin attempt to cancel non-existent booking {booking_id}.")
         return None
 
-    # Создаем новый список без удаленной записи
-    new_bookings_list = [b for b in all_bookings if b.get('id') != booking_id]
-
-    # Сохраняем и логируем
-    await _write_data(BOOKINGS_FILE, new_bookings_list)
-    log_msg_user = f"user {user_id}" if user_id is not None else "admin"
-    logger.info(f"Booking {booking_id} was cancelled by {log_msg_user}.")
-
-    return booking_to_cancel
-
 
 async def cancel_order_in_db(order_id: int, user_id: int | None = None) -> dict | None:
     """
-    Удаляет заказ по ID.
+    Отменяет заказ, обновляя его статус на 'cancelled'.
     - Если user_id указан, проверяет, что заказ принадлежит этому пользователю.
-    - Если user_id равен None (для админа), удаляет заказ по order_id без проверки владельца.
-    Возвращает удаленный объект заказа в случае успеха, иначе None.
+    Возвращает отмененный объект заказа в случае успеха, иначе None.
     """
-    all_orders = await get_all_orders()
-    order_to_cancel = None
+    pool = await get_pool()
+    sql = "UPDATE orders SET status = 'cancelled' WHERE order_id = $1"
+    if user_id:
+        sql += " AND user_id = $2"
+    sql += " RETURNING *;"
 
-    # Находим заказ для удаления
-    for order in all_orders:
-        if order.get('id') == order_id:
-            # Если удаляет пользователь, проверяем права
-            if user_id is not None and order.get('user_id') != user_id:
-                continue
-            order_to_cancel = order
-            break
+    async with pool.acquire() as connection:
+        params = [order_id]
+        if user_id:
+            params.append(user_id)
+        
+        cancelled_record = await connection.fetchrow(sql, *params)
 
-    if not order_to_cancel:
+    if cancelled_record:
+        log_msg_user = f"user {user_id}" if user_id is not None else "admin"
+        logger.info(f"Order {order_id} was cancelled by {log_msg_user}. Status set to 'cancelled'.")
+        # Мы не можем здесь вызвать _format_order_record, т.к. нет JOIN'а.
+        # Возвращаем базовые данные, хендлеру этого достаточно для уведомления.
+        return dict(cancelled_record)
+    else:
         if user_id is not None:
             logger.warning(f"Attempt to cancel non-existent or foreign order {order_id} by user {user_id}.")
         else:
             logger.warning(f"Admin attempt to cancel non-existent order {order_id}.")
         return None
 
-    # Создаем новый список без удаленного заказа
-    new_orders_list = [o for o in all_orders if o.get('id') != order_id]
-
-    # Сохраняем и логируем
-    await _write_data(ORDERS_FILE, new_orders_list)
-    log_msg_user = f"user {user_id}" if user_id is not None else "admin"
-    logger.info(f"Order {order_id} was cancelled by {log_msg_user}.")
-
-    return order_to_cancel
-
 
 async def get_all_unique_user_ids() -> set[int]:
     """Возвращает множество всех уникальных ID пользователей из заказов и записей."""
-    all_bookings = await get_all_bookings()
-    all_orders = await get_all_orders()
-
-    user_ids = set()
-    for booking in all_bookings:
-        if 'user_id' in booking:
-            user_ids.add(booking['user_id'])
-    for order in all_orders:
-        if 'user_id' in order:
-            user_ids.add(order['user_id'])
-
-    return user_ids
+    pool = await get_pool()
+    # Запрос к БД гораздо эффективнее, чем загрузка всех данных в память
+    sql = """
+        SELECT user_id FROM bookings
+        UNION
+        SELECT user_id FROM orders;
+    """
+    async with pool.acquire() as connection:
+        records = await connection.fetch(sql)
+        return {rec['user_id'] for rec in records}
 
 
 async def get_all_unique_users() -> dict[int, dict]:
-    """Возвращает словарь всех уникальных пользователей с их данными."""
-    all_bookings = await get_all_bookings()
-    all_orders = await get_all_orders()
-    all_records = all_bookings + all_orders
-
-    users = {}
-    for record in all_records:
-        user_id = record.get('user_id')
-        if user_id and user_id not in users:
-            users[user_id] = {
-                'user_full_name': record.get('user_full_name'),
-                'user_username': record.get('user_username')
-            }
-    return users
+    """Возвращает словарь всех уникальных пользователей с их данными из таблицы users."""
+    pool = await get_pool()
+    sql = "SELECT user_id, full_name as user_full_name, username as user_username FROM users;"
+    async with pool.acquire() as connection:
+        records = await connection.fetch(sql)
+        return {rec['user_id']: dict(rec) for rec in records}
 
 
 async def update_user_full_name(user_id: int, new_name: str) -> bool:
-    """Обновляет user_full_name для пользователя во всех записях и заказах."""
-    all_bookings = await get_all_bookings()
-    all_orders = await get_all_orders()
-    updated = False
+    """Обновляет full_name для пользователя в таблице users."""
+    pool = await get_pool()
+    sql = "UPDATE users SET full_name = $1 WHERE user_id = $2;"
+    async with pool.acquire() as connection:
+        result = await connection.execute(sql, new_name, user_id)
 
-    for booking in all_bookings:
-        if booking.get('user_id') == user_id:
-            booking['user_full_name'] = new_name
-            updated = True
-
-    for order in all_orders:
-        if order.get('user_id') == user_id:
-            order['user_full_name'] = new_name
-            updated = True
-
-    if updated:
-        await _write_data(BOOKINGS_FILE, all_bookings)
-        await _write_data(ORDERS_FILE, all_orders)
+    if result == "UPDATE 1":
         logger.info(f"Updated full name for user {user_id} to '{new_name}'")
-
-    return updated
+        return True
+    return False
 
 
 # --- Новые функции для работы с кандидатами через PostgreSQL ---
@@ -581,7 +707,7 @@ async def delete_candidate_in_db(candidate_id: int) -> dict | None:
         logger.info(f"Candidate {candidate_id} was deleted by admin.")
         return {**deleted_record, 'id': deleted_record['candidate_id']}
     else:
-        logger.warning(f"Admin attempt to delete non-existent candidate {candidate_id}.")
+        logger.warning(f"Admin tried to edit non-existent order #{order_id}")
         return None
 async def get_blocked_users() -> list[int]:
     """Возвращает список ID заблокированных пользователей из базы данных."""

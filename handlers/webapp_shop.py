@@ -38,12 +38,13 @@ async def handle_webapp_data(message: Message, state: FSMContext):
             return
 
         # Загружаем все товары и промокоды один раз
-        all_products = await get_all_products()
+        all_products_list = await get_all_products()
+        all_products_dict = {p['id']: p for p in all_products_list}
         promocodes_db = await get_all_promocodes()
 
         items_price = 0
         for item_id, quantity in cart.items():
-            product = all_products.get(item_id, {"name": "Неизвестный товар", "price": 0})
+            product = all_products_dict.get(item_id, {"name": "Неизвестный товар", "price": 0})
             items_price += product["price"] * quantity
         
         promocode = data.get('promocode')
@@ -81,7 +82,7 @@ async def handle_webapp_data(message: Message, state: FSMContext):
         )
         await state.set_state(OrderStates.choosing_shipping)
 
-def _build_user_confirmation_text(user_data: dict, all_products: dict) -> str:
+def _build_user_confirmation_text(user_data: dict, all_products_dict: dict) -> str:
     """Формирует текст подтверждения заказа для пользователя."""
     cart = user_data.get('cart', {})
     items_price = user_data.get('items_price', 0)
@@ -94,7 +95,7 @@ def _build_user_confirmation_text(user_data: dict, all_products: dict) -> str:
 
     text = "✅ <b>Спасибо за ваш заказ!</b>\n\nВы заказали:\n"
     for item_id, quantity in cart.items():
-        product = all_products.get(item_id, {"name": "Неизвестный товар", "price": 0})
+        product = all_products_dict.get(item_id, {"name": "Неизвестный товар", "price": 0})
         text += f"• {product['name']} x {quantity} шт. = {product['price'] * quantity} руб.\n"
     
     text += f"\nСтоимость товаров: {items_price} руб.\n"
@@ -109,7 +110,7 @@ def _build_user_confirmation_text(user_data: dict, all_products: dict) -> str:
     text += f"\n<b>Итого к оплате: {total_price:.2f} руб.</b>"
     return text
 
-async def _notify_admins_of_new_order(bot: Bot, user: User, order: dict, all_products: dict):
+async def _notify_admins_of_new_order(bot: Bot, user: User, order: dict, all_products_dict: dict):
     """Отправляет уведомление о новом заказе администраторам."""
     if not ADMIN_IDS: return
  
@@ -121,7 +122,7 @@ async def _notify_admins_of_new_order(bot: Bot, user: User, order: dict, all_pro
                   f"<b>От:</b> {user.full_name} (ID: <code>{user.id}</code>)\n"
                   f"<b>Username:</b> @{user.username or 'не указан'}\n\n<b>Состав заказа:</b>\n")
     for item_id, quantity in cart.items():
-        product = all_products.get(item_id, {"name": "Неизвестный товар"})
+        product = all_products_dict.get(item_id, {"name": "Неизвестный товар"})
         admin_text += f"• {product['name']} x {quantity} шт.\n"
     if discount_amount > 0:
         admin_text += f"\n<b>Промокод:</b> {order.get('promocode')} (-{discount_amount:.2f} руб.)"
@@ -142,7 +143,8 @@ async def _notify_admins_of_new_order(bot: Bot, user: User, order: dict, all_pro
 async def _finalize_order(message: Message, user: User, state: FSMContext, bot: Bot, is_callback: bool = False):
     """Внутренняя функция для завершения заказа, сохранения и отправки уведомлений."""
     # Загружаем все товары один раз, чтобы избежать многократных вызовов в цикле
-    all_products = await get_all_products()
+    all_products_list = await get_all_products()
+    all_products_dict = {p['id']: p for p in all_products_list}
 
     user_data = await state.get_data()
     cart = user_data.get('cart', {})
@@ -170,7 +172,7 @@ async def _finalize_order(message: Message, user: User, state: FSMContext, bot: 
     if promocode and discount_amount > 0:
         await increment_promocode_usage(promocode)
 
-    response_text = _build_user_confirmation_text(user_data, all_products)
+    response_text = _build_user_confirmation_text(user_data, all_products_dict)
     # Отправляем подтверждение пользователю
     if is_callback:
         await message.edit_text(response_text)
@@ -180,7 +182,7 @@ async def _finalize_order(message: Message, user: User, state: FSMContext, bot: 
     await state.clear()
 
     # Уведомляем администратора
-    await _notify_admins_of_new_order(bot, user, new_order, all_products)
+    await _notify_admins_of_new_order(bot, user, new_order, all_products_dict)
 
 
 @router.callback_query(OrderStates.choosing_shipping, F.data.startswith("shipping_"))

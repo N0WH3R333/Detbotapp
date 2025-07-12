@@ -102,4 +102,23 @@ CREATE TABLE IF NOT EXISTS candidates (
     file_name TEXT,
     received_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Таблица категорий товаров
+CREATE TABLE IF NOT EXISTS product_categories (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL UNIQUE
+);
+
+-- Таблица товаров
+CREATE TABLE IF NOT EXISTS products (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    price INT NOT NULL,
+    description TEXT,
+    image_url TEXT,
+    detail_images JSONB,
+    category_id TEXT NOT NULL REFERENCES product_categories(id) ON DELETE RESTRICT,
+    subcategory TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_products_category_id ON products(category_id);
 """
