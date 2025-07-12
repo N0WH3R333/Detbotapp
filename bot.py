@@ -8,8 +8,8 @@ from aiogram import Bot, Dispatcher, F
 from aiogram.client.default import DefaultBotProperties
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiohttp import web
-import aiohttp_cors
 import json
+import aiohttp_cors
 
 from config import (
     BOT_TOKEN, ADMIN_IDS, LOG_LEVEL, LOG_LEVEL_HANDLERS, LOG_LEVEL_DATABASE,
@@ -282,23 +282,29 @@ async def main() -> None:
     # Создаем веб-приложение aiohttp
     app = web.Application()
 
-    # Настраиваем CORS централизованно
-    cors = aiohttp_cors.setup(app, defaults={
-        # Разрешаем запросы от нашего WebApp.
-        # В продакшене лучше использовать конкретный URL, а не "*".
-        WEBAPP_URL: aiohttp_cors.ResourceOptions(
-            allow_credentials=True,
-            expose_headers="*",
-            allow_headers="*",
-            allow_methods=["GET", "OPTIONS"], # Указываем разрешенные методы
-        )
-    })
+    # Добавляем API-ручки
+    app.router.add_get("/api/products", products_api_handler)
+    app.router.add_get("/api/validate_promocode", validate_promocode_handler)
 
-    # Добавляем роуты и оборачиваем их в CORS
-    product_route = cors.add(app.router.add_resource("/api/products"))
-    cors.add(product_route.add_route("GET", products_api_handler))
-    promocode_route = cors.add(app.router.add_resource("/api/validate_promocode"))
-    cors.add(promocode_route.add_route("GET", validate_promocode_handler))
+    # Настраиваем CORS централизованно и более надежно
+    if WEBAPP_URL:
+        logging.info(f"CORS is configured to allow requests from: {WEBAPP_URL}")
+        cors = aiohttp_cors.setup(app, defaults={
+            WEBAPP_URL: aiohttp_cors.ResourceOptions(
+                allow_credentials=True,
+                expose_headers="*",
+                allow_headers="*",
+                allow_methods=["GET", "OPTIONS"],
+            )
+        })
+        # Применяем CORS ко всем роутам в приложении
+        for route in list(app.router.routes()):
+            cors.add(route)
+    else:
+        logging.warning(
+            "WEBAPP_URL is not set in environment variables. "
+            "CORS is not configured, which will likely cause the web app to fail."
+        )
     
     # Передаем экземпляр бота в диспетчер для dependency injection
     # Это позволит получать его в хэндлерах через тайп-хинтинг (bot: Bot)

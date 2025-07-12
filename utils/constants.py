@@ -1,56 +1,44 @@
-SERVICE_NAMES = {
-    # Services
+ALL_NAMES = {
+    # Services / Услуги
     "polishing": "✨ Полировка кузова",
     "ceramics": "🛡️ Керамика",
     "dry_cleaning": "🛋️ Химчистка",
     "wrapping": "🎨 Оклейка кузова",
     "washing": "💧 Трехфазная мойка",
     "glass_polishing": "🔍 Полировка стекол",
-}
-
-CAR_SIZE_NAMES = {
+    # Car sizes / Размеры машин
     "small": "🚗 Малый кузов",
     "medium": "🚙 Средний кузов",
     "large": "🚚 Большой кузов",
-}
-
-POLISHING_TYPE_NAMES = {
+    # Polishing types / Типы полировки
     "light_polishing": "✨ Легкая полировка",
     "deep_polishing": "💎 Глубокая полировка",
     "presale_polishing": "💰 Предпродажная полировка",
-}
-
-CERAMICS_TYPE_NAMES = {
+    # Ceramics types / Типы керамики
     "presale_ceramics": "💰 Предпродажная",
     "medium_ceramics": "🛡️ Средняя",
     "long_ceramics": "💎 Длительная",
-}
-
-WRAPPING_TYPE_NAMES = {
+    # Wrapping types / Типы оклейки
     "full_wrapping": "Полная оклейка",
     "local_wrapping": "Локальная оклейка",
-}
-
-INTERIOR_TYPE_NAMES = {
+    # Interior types / Типы салона
     "fabric": "🧵 Ткань",
     "leather": "🛋️ Кожа",
     "alcantara": "⚜️ Алькантара",
     "combined": "🔄 Комбинированный",
-}
-
-DIRT_LEVEL_NAMES = {
+    # Dirt levels / Уровни загрязнения
     "light": "🧼 Легкая",
     "medium": "🧽 Средняя",
     "strong": "💥 Сильная",
 }
 
 # Списки ключей, которые используются в bot.py
-CAR_SIZES = list(CAR_SIZE_NAMES.keys())
-POLISHING_TYPES = list(POLISHING_TYPE_NAMES.keys())
-CERAMICS_TYPES = list(CERAMICS_TYPE_NAMES.keys())
-WRAPPING_TYPES = list(WRAPPING_TYPE_NAMES.keys())
-INTERIOR_TYPES = list(INTERIOR_TYPE_NAMES.keys())
-DIRT_LEVELS = list(DIRT_LEVEL_NAMES.keys())
+CAR_SIZES = ["small", "medium", "large"]
+POLISHING_TYPES = ["light_polishing", "deep_polishing", "presale_polishing"]
+CERAMICS_TYPES = ["presale_ceramics", "medium_ceramics", "long_ceramics"]
+WRAPPING_TYPES = ["full_wrapping", "local_wrapping"]
+INTERIOR_TYPES = ["fabric", "leather", "alcantara", "combined"]
+DIRT_LEVELS = ["light", "medium", "strong"]
 
 # Единый список рабочих часов для записи
 WORKING_HOURS = [

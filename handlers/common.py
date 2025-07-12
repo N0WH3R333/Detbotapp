@@ -8,7 +8,7 @@ from aiogram.exceptions import TelegramBadRequest
 
 from keyboards.reply import get_main_menu_keyboard
 from keyboards.inline import get_my_bookings_keyboard, CancelBooking, OrderPaginator, get_orders_keyboard, CancelOrder
-from database.db import get_user_bookings, cancel_booking_in_db, get_user_orders, cancel_order_in_db, get_product_by_id
+from database.db import get_user_bookings, cancel_booking_in_db, get_user_orders, cancel_order_in_db, get_all_products
 from config import WEBAPP_URL, ADMIN_IDS
 from utils.scheduler import cancel_reminder
 
@@ -120,7 +120,7 @@ async def cancel_my_booking(callback: CallbackQuery, callback_data: CancelBookin
     await callback.answer(f"Запись #{booking_id_to_cancel} отменена.")
 
 
-async def format_orders_page(orders_on_page: list[dict]) -> str:
+async def format_orders_page(orders_on_page: list[dict], all_products: dict) -> str:
     """Форматирует текст для одной страницы истории заказов."""
     response_text = "<b>История ваших заказов:</b>\n\n"
     for order in orders_on_page:
@@ -132,7 +132,7 @@ async def format_orders_page(orders_on_page: list[dict]) -> str:
         discount_amount = order.get("discount_amount", 0)
         address = order.get("address")
         for item_id, quantity in order['cart'].items():
-            product = await get_product_by_id(item_id) or {"name": "Неизвестный товар"}
+            product = all_products.get(item_id, {"name": "Неизвестный товар"})
             response_text += f"  - {product['name']} x {quantity} шт.\n"
         if discount_amount > 0 and promocode:
             response_text += f"<i>Скидка по промокоду '{promocode}': -{discount_amount:.2f} руб.</i>\n"
@@ -157,8 +157,10 @@ async def show_my_orders(message: Message):
         return
 
     page = 0
+    # Загружаем все товары один раз перед форматированием
+    all_products = await get_all_products()
     total_pages = math.ceil(len(orders) / ORDERS_PER_PAGE)
-    text = await format_orders_page(orders[0:ORDERS_PER_PAGE])
+    text = await format_orders_page(orders[0:ORDERS_PER_PAGE], all_products)
 
     await message.answer(text, reply_markup=get_orders_keyboard(page=page, total_pages=total_pages, orders_on_page=orders[0:ORDERS_PER_PAGE]))
 
@@ -169,11 +171,13 @@ async def paginate_orders(callback: CallbackQuery, callback_data: OrderPaginator
 
     orders = await get_user_orders(user_id=callback.from_user.id)
     orders.reverse()
+    # Загружаем товары и здесь
+    all_products = await get_all_products()
 
     total_pages = math.ceil(len(orders) / ORDERS_PER_PAGE)
     start_index = page * ORDERS_PER_PAGE
     end_index = start_index + ORDERS_PER_PAGE
-    text = await format_orders_page(orders[start_index:end_index])
+    text = await format_orders_page(orders[start_index:end_index], all_products)
 
     await callback.message.edit_text(text, reply_markup=get_orders_keyboard(page=page, total_pages=total_pages, orders_on_page=orders[start_index:end_index]))
     await callback.answer()
@@ -217,9 +221,10 @@ async def cancel_my_order(callback: CallbackQuery, callback_data: CancelOrder, b
         return
 
     page = 0
+    all_products = await get_all_products()
     total_pages = math.ceil(len(orders) / ORDERS_PER_PAGE)
     orders_on_page = orders[0:ORDERS_PER_PAGE]
-    text = await format_orders_page(orders_on_page)
+    text = await format_orders_page(orders_on_page, all_products)
 
     try:
         await callback.message.edit_text(text, reply_markup=get_orders_keyboard(page=page, total_pages=total_pages, orders_on_page=orders_on_page))

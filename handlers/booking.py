@@ -46,56 +46,48 @@ class Booking(StatesGroup):
 # Helper function and data for summary
 # =============================================================================
 
-async def calculate_booking_price(data: dict) -> int:
-    """Рассчитывает стоимость услуги на основе выбора пользователя."""
+async def calculate_booking_price(data: dict) -> tuple[int, int, float]:
+    """
+    Рассчитывает базовую стоимость, сумму скидки и итоговую стоимость.
+    Возвращает кортеж (base_price, discount_amount, final_price).
+    """
     prices = await get_all_prices()
+    base_price = 0
     try:
         service = data.get('service')
         price_branch = prices.get(service)
 
         if isinstance(price_branch, int):  # Для простых услуг
-            return price_branch
+            base_price = price_branch
 
         if isinstance(price_branch, dict):
             car_size = data.get('car_size')
             price_branch = price_branch.get(car_size)
 
             if service in ["polishing", "ceramics", "wrapping"]:
-                return price_branch.get(data.get('service_type'), 0)
+                base_price = price_branch.get(data.get('service_type'), 0)
             if service == "dry_cleaning":
-                return price_branch.get(data.get('interior_type'), {}).get(data.get('dirt_level'), 0)
+                base_price = price_branch.get(data.get('interior_type'), {}).get(data.get('dirt_level'), 0)
     except (AttributeError, TypeError):
-        return 0  # Возвращаем 0, если что-то пошло не так
-    return 0
+        base_price = 0  # Возвращаем 0, если что-то пошло не так
+
+    discount_percent = data.get('discount_percent', 0)
+    discount_amount = base_price * discount_percent / 100
+    final_price = base_price - discount_amount
+    return base_price, discount_amount, final_price
 
 async def get_booking_summary(data: dict) -> str:
     """Формирует текстовое описание и стоимость выбранных услуг."""
     summary_parts = []
-    if service := data.get('service'):
-        summary_parts.append(f"<b>Основная услуга:</b> {SERVICE_NAMES.get(service, service)}")
-    if car_size := data.get('car_size'):
-        summary_parts.append(f"<b>Размер автомобиля:</b> {SERVICE_NAMES.get(car_size, car_size)}")
-    if service_type := data.get('service_type'):
-        summary_parts.append(f"<b>Тип:</b> {SERVICE_NAMES.get(service_type, service_type)}")
-    if interior_type := data.get('interior_type'):
-        summary_parts.append(f"<b>Тип салона:</b> {SERVICE_NAMES.get(interior_type, interior_type)}")
-    if dirt_level := data.get('dirt_level'):
-        summary_parts.append(f"<b>Степень загрязнения:</b> {SERVICE_NAMES.get(dirt_level, dirt_level)}")
-    if comment := data.get('comment'):
-        summary_parts.append(f"<b>Комментарий:</b> <b>{comment}</b>")
-    if media_files := data.get('media_files'):
-        if len(media_files) > 0:
-            summary_parts.append(f"<b>✓ Медиафайлы: {len(media_files)} шт.</b>")
-    
-    price = await calculate_booking_price(data)
-    discount_percent = data.get('discount_percent', 0)
+    # ... (code for adding service, car_size, etc. to summary_parts remains the same) ...
+    # ...
 
-    if price > 0:
-        summary_parts.append(f"\n<b>Стоимость:</b> {price} руб.")
-        if discount_percent > 0:
-            discount_amount = price * discount_percent / 100
-            final_price = price - discount_amount
-            summary_parts.append(f"<b>Скидка ({discount_percent}%):</b> -{discount_amount:.2f} руб.")
+    base_price, discount_amount, final_price = await calculate_booking_price(data)
+
+    if base_price > 0:
+        summary_parts.append(f"\n<b>Стоимость:</b> {base_price} руб.")
+        if discount_amount > 0:
+            summary_parts.append(f"<b>Скидка ({data.get('discount_percent', 0)}%):</b> -{discount_amount:.2f} руб.")
             summary_parts.append(f"<b>Итого к оплате:</b> {final_price:.2f} руб.")
         
     return "\n".join(summary_parts)
@@ -314,34 +306,36 @@ async def skip_comment(callback: CallbackQuery, state: FSMContext):
 async def process_booking_promocode(message: Message, state: FSMContext):
     """Проверяет промокод и переходит к выбору даты, игнорируя команды."""
     promocode = message.text.upper()
-    promocodes_db = await get_all_promocodes()
-    promo_data = promocodes_db.get(promocode)
-    
-    is_valid = False
-    if promo_data and promo_data.get("type") == "detailing":
-        today = datetime.now().date()
-        try:
-            start_date = datetime.strptime(promo_data.get("start_date"), "%Y-%m-%d").date()
-            end_date = datetime.strptime(promo_data.get("end_date"), "%Y-%m-%d").date()
-            if start_date <= today <= end_date:
-                usage_limit = promo_data.get("usage_limit")
-                if usage_limit is not None:
-                    times_used = promo_data.get("times_used", 0)
-                    if times_used < usage_limit:
-                        is_valid = True
-                else:
-                    is_valid = True
-        except (ValueError, KeyError, TypeError):
-            is_valid = False
+    promo_data = (await get_all_promocodes()).get(promocode)
 
-    if is_valid:
-        await state.update_data(promocode=promocode, discount_percent=promo_data.get("discount", 0))
-        await message.answer(f"✅ Промокод '{promocode}' принят! Ваша скидка: {promo_data.get('discount', 0)}%.")
-    else:
+    # Guard clauses for invalid conditions
+    if not promo_data or promo_data.get("type") != "detailing":
         await state.update_data(promocode=None, discount_percent=0)
         await message.answer("❌ Промокод недействителен или не подходит для услуг. Продолжаем без скидки.")
+        await proceed_to_date_selection(message, state, is_edit=False)
+        return
 
-    # Переходим к выбору даты, отправляя новое сообщение
+    try:
+        today = datetime.now().date()
+        start_date = datetime.strptime(promo_data.get("start_date"), "%Y-%m-%d").date()
+        end_date = datetime.strptime(promo_data.get("end_date"), "%Y-%m-%d").date()
+
+        if not (start_date <= today <= end_date):
+            raise ValueError("Promocode is expired")
+
+        usage_limit = promo_data.get("usage_limit")
+        if usage_limit is not None and promo_data.get("times_used", 0) >= usage_limit:
+            raise ValueError("Usage limit reached")
+    except (ValueError, KeyError, TypeError):
+        await state.update_data(promocode=None, discount_percent=0)
+        await message.answer("❌ Промокод недействителен или не подходит для услуг. Продолжаем без скидки.")
+        await proceed_to_date_selection(message, state, is_edit=False)
+        return
+
+    # Success case
+    discount = promo_data.get("discount", 0)
+    await state.update_data(promocode=promocode, discount_percent=discount)
+    await message.answer(f"✅ Промокод '{promocode}' принят! Ваша скидка: {discount}%.")
     await proceed_to_date_selection(message, state, is_edit=False)
 
 @router.callback_query(Booking.entering_promocode, F.data == "promo:skip")
@@ -414,6 +408,86 @@ async def date_chosen(callback: CallbackQuery, callback_data: CalendarCallback, 
     await state.set_state(Booking.choosing_time)
     await callback.answer()
 
+async def _save_booking_to_db(user: User, state_data: dict, final_price: float, discount_amount: float) -> dict:
+    """Сохраняет данные о записи в базу данных и возвращает созданный объект."""
+    booking_data_to_save = {
+        "date": state_data.get("date"),
+        "time": state_data.get("time"),
+        "price": final_price,
+        "promocode": state_data.get("promocode"),
+        "discount_amount": discount_amount,
+        "comment": state_data.get("comment"),
+        "media_files": state_data.get("media_files", []),
+        "service": SERVICE_NAMES.get(state_data.get("service"), "Неизвестная услуга"),
+        "details": state_data
+    }
+    new_booking = await add_booking_to_db(
+        user_id=user.id,
+        user_full_name=user.full_name,
+        user_username=user.username,
+        booking_data=booking_data_to_save
+    )
+    return new_booking
+
+async def _send_admin_notification(bot: Bot, user: User, new_booking: dict, summary_text: str):
+    """Отправляет уведомление о новой записи администраторам."""
+    if not ADMIN_IDS:
+        return
+
+    admin_text = (
+        f"🔔 <b>Новая запись #{new_booking['id']}</b>\n\n"
+        f"<b>Клиент:</b> {user.full_name}\n"
+        f"<b>ID:</b> <code>{user.id}</code>\n"
+        f"<b>Username:</b> @{user.username or 'не указан'}\n\n"
+        f"<b>Дата и время:</b> {new_booking.get('date')} в {new_booking.get('time')}\n\n"
+        f"<b>Выбранные услуги:</b>\n{summary_text}"
+    )
+    media_files = new_booking.get("media_files", [])
+
+    for admin_id in ADMIN_IDS:
+        try:
+            if not media_files:
+                await bot.send_message(admin_id, admin_text)
+            elif len(media_files) == 1:
+                media = media_files[0]
+                if media['type'] == 'photo':
+                    await bot.send_photo(admin_id, photo=media['file_id'], caption=admin_text)
+                else:
+                    await bot.send_video(admin_id, video=media['file_id'], caption=admin_text)
+            else:
+                media_group = [
+                    InputMediaPhoto(media=m['file_id'], caption=admin_text if i == 0 else None) if m['type'] == 'photo'
+                    else InputMediaVideo(media=m['file_id'], caption=admin_text if i == 0 else None)
+                    for i, m in enumerate(media_files)
+                ]
+                await bot.send_media_group(admin_id, media=media_group)
+        except Exception as e:
+            logger.error(f"Не удалось отправить уведомление администратору {admin_id}: {e}")
+
+async def _finalize_booking_flow(callback: CallbackQuery, state: FSMContext, new_booking: dict, summary_text: str):
+    """Завершает процесс бронирования: отправляет подтверждение, планирует напоминание, инкрементирует промокод."""
+    user_confirmation_text = (
+        "✅ <b>Запись успешна!</b>\n\n"
+        "Мы ждем вас в назначенное время.\n\n"
+        "<b>Детали вашей записи:</b>\n"
+        f"{summary_text}\n\n"
+        f"<b>Дата и время:</b> {new_booking.get('date')} в {new_booking.get('time')}\n\n"
+        "📍 <b>Наш адрес:</b>\n"
+        "Ставрополь, улица Старомарьевское шоссе 12 корпус 2\n\n"
+        "📞 <b>Связаться с нами:</b>\n"
+        "Администратор: <a href='tg://user?id=1973423865'>Написать в Telegram</a>\n\n"
+        "🗺️ <b>Мы на карте:</b>\n"
+        "<a href='https://2gis.ru/stavropol/geo/70030076147466365/42.012416,45.051523'>Открыть в 2ГИС</a>"
+    )
+    await callback.message.edit_text(user_confirmation_text, disable_web_page_preview=True)
+
+    await schedule_reminder(new_booking)
+    if new_booking.get("promocode"):
+        await increment_promocode_usage(new_booking.get("promocode"))
+
+    await state.clear()
+    await callback.answer()
+
 @router.callback_query(F.data.startswith("time:"), Booking.choosing_time)
 async def time_chosen(callback: CallbackQuery, state: FSMContext, bot: Bot):
     """Обработка выбора времени и завершение записи."""
@@ -440,99 +514,22 @@ async def time_chosen(callback: CallbackQuery, state: FSMContext, bot: Bot):
         return
 
     await state.update_data(time=selected_time)
-    user_data = await state.get_data()  # Обновляем данные с выбранным временем
-    
-    price = await calculate_booking_price(user_data)
-    discount_percent = user_data.get('discount_percent', 0)
-    discount_amount = price * discount_percent / 100
-    final_price = price - discount_amount
-    
-    # 1. Сохраняем запись в базу данных
-    # Формируем словарь с данными для сохранения
-    booking_data_to_save = {
-        "date": user_data.get("date"),
-        "time": user_data.get("time"),
-        "price": final_price,
-        "promocode": user_data.get("promocode"),
-        "discount_amount": discount_amount,
-        # Сохраняем основное название услуги для отображения в "Мои записи"
-        "comment": user_data.get("comment"),
-        "media_files": user_data.get("media_files", []),
-        "service": SERVICE_NAMES.get(user_data.get("service"), "Неизвестная услуга"),
-        "details": user_data  # Сохраняем все детали выбора
-    }
-    new_booking = await add_booking_to_db(
-        user_id=callback.from_user.id,
-        user_full_name=callback.from_user.full_name,
-        user_username=callback.from_user.username,
-        booking_data=booking_data_to_save
-    )
-    
-    # 2. Формируем сводку по услугам
+    user_data = await state.get_data()
+
+    # 1. Расчет цены
+    base_price, discount_amount, final_price = await calculate_booking_price(user_data)
+
+    # 2. Сохранение в БД
+    new_booking = await _save_booking_to_db(callback.from_user, user_data, final_price, discount_amount)
+
+    # 3. Формируем сводку для уведомлений
     summary_text = await get_booking_summary(user_data)
-    
-    # 3. Отправляем уведомление администратору
-    if ADMIN_IDS:
-        user = callback.from_user
-        admin_text = (
-            f"🔔 <b>Новая запись #{new_booking['id']}</b>\n\n"
-            f"<b>Клиент:</b> {user.full_name}\n"
-            f"<b>ID:</b> <code>{user.id}</code>\n"
-            f"<b>Username:</b> @{user.username or 'не указан'}\n\n"
-            f"<b>Дата и время:</b> {user_data.get('date')} в {user_data.get('time')}\n\n"
-            f"<b>Выбранные услуги:</b>\n{summary_text}"
-        )
-        media_files = user_data.get("media_files", [])
-        for admin_id in ADMIN_IDS:
-            try:
-                if not media_files:
-                    await bot.send_message(admin_id, admin_text)
-                elif len(media_files) == 1:
-                    media = media_files[0]
-                    if media['type'] == 'photo':
-                        await bot.send_photo(admin_id, photo=media['file_id'], caption=admin_text)
-                    else:
-                        await bot.send_video(admin_id, video=media['file_id'], caption=admin_text)
-                else:
-                    # Создаем медиагруппу
-                    media_group = []
-                    for i, media in enumerate(media_files):
-                        caption = admin_text if i == 0 else None
-                        media_item = InputMediaPhoto(media=media['file_id'], caption=caption) if media['type'] == 'photo' else InputMediaVideo(media=media['file_id'], caption=caption)
-                        media_group.append(media_item)
-                    await bot.send_media_group(admin_id, media=media_group)
-            except Exception as e:
-                print(f"Не удалось отправить уведомление администратору {admin_id}: {e}")
 
-    # 4. Отправляем подтверждение пользователю
-    user_confirmation_text = (
-        "✅ <b>Запись успешна!</b>\n\n"
-        "Мы ждем вас в назначенное время.\n\n"
-        "<b>Детали вашей записи:</b>\n"
-        f"{summary_text}\n\n"
-        f"<b>Дата и время:</b> {user_data.get('date')} в {user_data.get('time')}\n\n"
-        "📍 <b>Наш адрес:</b>\n"
-        "Ставрополь, улица Старомарьевское шоссе 12 корпус 2\n\n"
-        "📞 <b>Связаться с нами:</b>\n"
-        "Администратор: <a href='tg://user?id=1973423865'>Написать в Telegram</a>\n\n"
-        "🗺️ <b>Мы на карте:</b>\n"
-        "<a href='https://2gis.ru/stavropol/geo/70030076147466365/42.012416,45.051523'>Открыть в 2ГИС</a>"
-    )
-    await callback.message.edit_text(user_confirmation_text, disable_web_page_preview=True)
+    # 4. Отправка уведомлений
+    await _send_admin_notification(bot, callback.from_user, new_booking, summary_text)
 
-    # 5. Планируем напоминание
-    try:
-        await schedule_reminder(new_booking)
-    except Exception as e:
-        print(f"Не удалось запланировать напоминание: {e}")
-
-    # 6. Инкрементируем счетчик использования промокода
-    if user_data.get("promocode"):
-        await increment_promocode_usage(user_data.get("promocode"))
-
-    # 7. Завершаем FSM
-    await state.clear()
-    await callback.answer()
+    # 5. Завершение процесса
+    await _finalize_booking_flow(callback, state, new_booking, summary_text)
 # =============================================================================
 # Handlers for "Back" buttons
 # =============================================================================

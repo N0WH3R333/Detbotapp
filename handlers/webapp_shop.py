@@ -37,37 +37,36 @@ async def handle_webapp_data(message: Message, state: FSMContext):
             await message.answer("Ваша корзина пуста.")
             return
 
+        # Загружаем все товары и промокоды один раз
+        all_products = await get_all_products()
+        promocodes_db = await get_all_promocodes()
+
         items_price = 0
         for item_id, quantity in cart.items():
-            # Используем новую функцию для поиска товара
-            product = await get_product_by_id(item_id) or {"name": "Неизвестный товар", "price": 0}
+            product = all_products.get(item_id, {"name": "Неизвестный товар", "price": 0})
             items_price += product["price"] * quantity
         
         promocode = data.get('promocode')
         discount_percent = 0
-        if promocode:
-            promocodes_db = await get_all_promocodes()
-            promo_data = promocodes_db.get(promocode)
-            if promo_data:
-                today = datetime.now().date()
-                try:
-                    start_date = datetime.strptime(promo_data.get("start_date"), "%Y-%m-%d").date()
-                    end_date = datetime.strptime(promo_data.get("end_date"), "%Y-%m-%d").date()
-                    if start_date <= today <= end_date:
-                        # Проверка лимита
-                        usage_limit = promo_data.get("usage_limit")
-                        if usage_limit is not None:
-                            times_used = promo_data.get("times_used", 0)
-                            if times_used >= usage_limit:
-                                logger.warning(f"User {message.from_user.id} tried to use a limit-reached promocode {promocode}.")
-                                # Не применяем скидку, но продолжаем заказ
-                                discount_percent = 0
-                            else:
-                                discount_percent = promo_data.get("discount", 0)
-                        else:
-                            discount_percent = promo_data.get("discount", 0)
-                except (ValueError, KeyError, TypeError):
-                    logger.warning(f"Promocode {promocode} has invalid data format, ignoring.")
+        promo_data = promocodes_db.get(promocode) if promocode else None
+
+        if promo_data:
+            today = datetime.now().date()
+            try:
+                start_date = datetime.strptime(promo_data.get("start_date"), "%Y-%m-%d").date()
+                end_date = datetime.strptime(promo_data.get("end_date"), "%Y-%m-%d").date()
+                
+                # Проверяем все условия для валидности промокода
+                is_active = start_date <= today <= end_date
+                usage_limit = promo_data.get("usage_limit")
+                is_limit_ok = (usage_limit is None) or (promo_data.get("times_used", 0) < usage_limit)
+
+                if is_active and is_limit_ok:
+                    discount_percent = promo_data.get("discount", 0)
+                else:
+                    logger.warning(f"User {message.from_user.id} tried to use an invalid/expired/limit-reached promocode {promocode}.")
+            except (ValueError, KeyError, TypeError):
+                logger.warning(f"Promocode {promocode} has invalid data format, ignoring.")
 
         # Сохраняем данные заказа в FSM и запрашиваем способ доставки
         await state.update_data(
@@ -85,6 +84,9 @@ async def handle_webapp_data(message: Message, state: FSMContext):
 
 async def _finalize_order(message: Message, user: User, state: FSMContext, bot: Bot, is_callback: bool = False):
     """Внутренняя функция для завершения заказа, сохранения и отправки уведомлений."""
+    # Загружаем все товары один раз, чтобы избежать многократных вызовов в цикле
+    all_products = await get_all_products()
+
     user_data = await state.get_data()
     cart = user_data.get('cart', {})
     items_price = user_data.get('items_price', 0)
@@ -99,8 +101,7 @@ async def _finalize_order(message: Message, user: User, state: FSMContext, bot: 
     # Формируем итоговый текст для пользователя
     response_text = "✅ <b>Спасибо за ваш заказ!</b>\n\nВы заказали:\n"
     for item_id, quantity in cart.items():
-        # Используем новую функцию для поиска товара
-        product = await get_product_by_id(item_id) or {"name": "Неизвестный товар", "price": 0}
+        product = all_products.get(item_id, {"name": "Неизвестный товар", "price": 0})
         response_text += f"• {product['name']} x {quantity} шт. = {product['price'] * quantity} руб.\n"
     
     response_text += f"\nСтоимость товаров: {items_price} руб.\n"
@@ -146,8 +147,7 @@ async def _finalize_order(message: Message, user: User, state: FSMContext, bot: 
         admin_text = f"🔔 <b>Новый заказ #{new_order['id']}!</b>\n\n<b>От:</b> {user.full_name} (ID: <code>{user.id}</code>)\n"
         admin_text += f"<b>Username:</b> @{user.username or 'не указан'}\n\n<b>Состав заказа:</b>\n"
         for item_id, quantity in cart.items():
-            # Используем новую функцию для поиска товара
-            product = await get_product_by_id(item_id) or {"name": "Неизвестный товар"}
+            product = all_products.get(item_id, {"name": "Неизвестный товар"})
             admin_text += f"• {product['name']} x {quantity} шт.\n"
         if discount_amount > 0:
             admin_text += f"\n<b>Промокод:</b> {promocode} (-{discount_amount:.2f} руб.)"
