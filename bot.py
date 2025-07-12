@@ -105,7 +105,7 @@ async def products_api_handler(request: web.Request) -> web.Response:
         # Используем .strip() для удаления случайных пробелов.
         category_name = product.get("category", "Без категории").strip()
         # Если подкатегория не указана, помещаем товар в подкатегорию "Основное"
-        subcategory_name = product.get("subcategory", "").strip() or "Основное"
+        subcategory_name = (product.get("subcategory") or "").strip() or "Основное"
 
         if not category_name:
             category_name = "Без категории"
