@@ -9,9 +9,10 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.utils.keyboard import InlineKeyboardBuilder
+from aiogram.types import InputMediaPhoto, InputMediaVideo
 
 from database.db import (
-    get_all_bookings, cancel_booking_in_db, get_blocked_dates,
+    get_all_bookings, cancel_booking_in_db, get_blocked_dates, get_booking_by_id,
     add_blocked_date, remove_blocked_date
 )
 from keyboards.admin_inline import (
@@ -19,6 +20,7 @@ from keyboards.admin_inline import (
 )
 from keyboards.calendar import create_admin_day_management_calendar, StatsCalendarCallback
 from utils.scheduler import cancel_reminder
+from .info_cmds import format_booking_details_for_admin
 from .states import AdminStates
 
 ADMIN_ITEMS_PER_PAGE = 5
@@ -29,6 +31,12 @@ class AdminCancelBooking(CallbackData, prefix="adm_cancel_booking"):
     booking_id: int
     page: int
     period: str
+
+class AdminBookingDetails(CallbackData, prefix="adm_b_details"):
+    booking_id: int
+    page: int
+    period: str
+
 
 async def _get_filtered_bookings(period: str) -> tuple[list, str]:
     """Возвращает отфильтрованный и отсортированный список записей и заголовок."""
@@ -71,9 +79,15 @@ async def _get_filtered_bookings(period: str) -> tuple[list, str]:
 def get_admin_bookings_list_keyboard(bookings_on_page: list, page: int, total_pages: int, period: str) -> types.InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     for booking in bookings_on_page:
-        builder.button(
-            text=f"❌ Отменить запись #{booking['id']}",
-            callback_data=AdminCancelBooking(booking_id=booking['id'], page=page, period=period).pack()
+        builder.row(
+            types.InlineKeyboardButton(
+                text=f"📄 Подробнее #{booking['id']}",
+                callback_data=AdminBookingDetails(booking_id=booking['id'], page=page, period=period).pack()
+            ),
+            types.InlineKeyboardButton(
+                text=f"❌ Отменить",
+                callback_data=AdminCancelBooking(booking_id=booking['id'], page=page, period=period).pack()
+            )
         )
     builder.adjust(1)
     pagination_row = []
@@ -140,6 +154,42 @@ async def show_bookings_period(callback: CallbackQuery):
     )
     await callback.answer()
 
+@router.callback_query(AdminBookingDetails.filter())
+async def show_booking_details(callback: types.CallbackQuery, callback_data: AdminBookingDetails, bot: Bot):
+    """Показывает детальную информацию о записи по кнопке 'Подробнее'."""
+    booking_id = callback_data.booking_id
+    booking = await get_booking_by_id(booking_id)
+
+    if not booking:
+        await callback.answer(f"Запись с ID {booking_id} не найдена.", show_alert=True)
+        return
+
+    info_text = format_booking_details_for_admin(booking)
+    
+    # Создаем кнопку "Назад"
+    builder = InlineKeyboardBuilder()
+    builder.button(
+        text="⬅️ Назад к списку",
+        # Используем пагинатор с действием "noop", чтобы вернуться на ту же страницу
+        callback_data=AdminBookingsPaginator(action="noop", page=callback_data.page, period=callback_data.period).pack()
+    )
+
+    # Сначала редактируем сообщение с текстовой информацией
+    await callback.message.edit_text(info_text, reply_markup=builder.as_markup())
+
+    # Затем, если есть медиа, отправляем их отдельным сообщением
+    media_files = booking.get("media_files", [])
+    if media_files:
+        if len(media_files) == 1:
+            media = media_files[0]
+            await (bot.send_photo(callback.from_user.id, photo=media['file_id']) if media['type'] == 'photo'
+                   else bot.send_video(callback.from_user.id, video=media['file_id']))
+        else:
+            media_group = [InputMediaPhoto(media=m['file_id']) if m['type'] == 'photo' else InputMediaVideo(media=m['file_id']) for m in media_files]
+            await bot.send_media_group(callback.from_user.id, media=media_group)
+    
+    await callback.answer()
+    
 @router.callback_query(AdminBookingsPaginator.filter())
 async def paginate_admin_bookings(callback: CallbackQuery, callback_data: AdminBookingsPaginator):
     page = callback_data.page + 1 if callback_data.action == "next" else callback_data.page - 1

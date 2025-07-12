@@ -19,9 +19,16 @@ CREATE TABLE IF NOT EXISTS users (
     full_name TEXT NOT NULL,
     username TEXT,
     first_seen TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-    is_blocked BOOLEAN DEFAULT FALSE,
-    internal_note TEXT -- Новое поле для внутренних заметок о клиенте
+    is_blocked BOOLEAN DEFAULT FALSE
 );
+
+-- Добавляем колонку для заметок, если она не существует (для обратной совместимости)
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='internal_note') THEN
+        ALTER TABLE users ADD COLUMN internal_note TEXT;
+    END IF;
+END$$;
 
 -- Таблица для промокодов
 CREATE TABLE IF NOT EXISTS promocodes (
