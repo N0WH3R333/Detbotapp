@@ -81,6 +81,63 @@ async def handle_webapp_data(message: Message, state: FSMContext):
         )
         await state.set_state(OrderStates.choosing_shipping)
 
+def _build_user_confirmation_text(user_data: dict, all_products: dict) -> str:
+    """Формирует текст подтверждения заказа для пользователя."""
+    cart = user_data.get('cart', {})
+    items_price = user_data.get('items_price', 0)
+    promocode = user_data.get('promocode')
+    discount_amount = (items_price * user_data.get('discount_percent', 0)) / 100
+    delivery_cost = user_data.get('delivery_cost', 0)
+    total_price = items_price - discount_amount + delivery_cost
+    shipping_method = user_data.get('shipping_method', 'Не указан')
+    address = user_data.get('address')
+
+    text = "✅ <b>Спасибо за ваш заказ!</b>\n\nВы заказали:\n"
+    for item_id, quantity in cart.items():
+        product = all_products.get(item_id, {"name": "Неизвестный товар", "price": 0})
+        text += f"• {product['name']} x {quantity} шт. = {product['price'] * quantity} руб.\n"
+    
+    text += f"\nСтоимость товаров: {items_price} руб.\n"
+    if discount_amount > 0:
+        text += f"Скидка по промокоду '{promocode}': -{discount_amount:.2f} руб.\n"
+    if delivery_cost > 0:
+        text += f"Стоимость доставки: {delivery_cost} руб.\n"
+
+    text += f"\n<b>Способ получения:</b> {shipping_method}"
+    if address:
+        text += f"\n<b>Адрес доставки:</b> {address}"
+    text += f"\n<b>Итого к оплате: {total_price:.2f} руб.</b>"
+    return text
+
+async def _notify_admins_of_new_order(bot: Bot, user: User, order: dict, all_products: dict):
+    """Отправляет уведомление о новом заказе администраторам."""
+    if not ADMIN_IDS: return
+ 
+    cart = new_order.get('cart', {})
+    discount_amount = new_order.get('discount_amount', 0)
+    delivery_cost = new_order.get('delivery_cost', 0)
+    
+    admin_text = (f"🔔 <b>Новый заказ #{new_order['id']}!</b>\n\n"
+                  f"<b>От:</b> {user.full_name} (ID: <code>{user.id}</code>)\n"
+                  f"<b>Username:</b> @{user.username or 'не указан'}\n\n<b>Состав заказа:</b>\n")
+    for item_id, quantity in cart.items():
+        product = all_products.get(item_id, {"name": "Неизвестный товар"})
+        admin_text += f"• {product['name']} x {quantity} шт.\n"
+    if discount_amount > 0:
+        admin_text += f"\n<b>Промокод:</b> {new_order.get('promocode')} (-{discount_amount:.2f} руб.)"
+    if delivery_cost > 0:
+        admin_text += f"\n<b>Доставка:</b> {delivery_cost} руб."
+    admin_text += f"\n<b>Способ получения:</b> {new_order.get('shipping_method')}"
+    if address := new_order.get('address'):
+        admin_text += f"\n<b>Адрес доставки:</b> {address}"
+    admin_text += f"\n<b>Итого: {new_order.get('total_price', 0):.2f} руб.</b>"
+    
+    for admin_id in ADMIN_IDS:
+        try:
+            await bot.send_message(admin_id, admin_text, reply_markup=get_new_order_admin_keyboard())
+            logger.info(f"Admin {admin_id} has been notified about the new order from user {user.id}.")
+        except Exception as e:
+            logger.error(f"Failed to send notification to admin {admin_id}: {e}")
 
 async def _finalize_order(message: Message, user: User, state: FSMContext, bot: Bot, is_callback: bool = False):
     """Внутренняя функция для завершения заказа, сохранения и отправки уведомлений."""
@@ -89,39 +146,18 @@ async def _finalize_order(message: Message, user: User, state: FSMContext, bot: 
 
     user_data = await state.get_data()
     cart = user_data.get('cart', {})
-    items_price = user_data.get('items_price', 0)
     promocode = user_data.get('promocode')
-    discount_percent = user_data.get('discount_percent', 0)
-    delivery_cost = user_data.get('delivery_cost', 0)
-    discount_amount = (items_price * discount_percent) / 100
-    total_price = items_price - discount_amount + delivery_cost
-    shipping_method = user_data.get('shipping_method', 'Не указан')
-    address = user_data.get('address')
-
-    # Формируем итоговый текст для пользователя
-    response_text = "✅ <b>Спасибо за ваш заказ!</b>\n\nВы заказали:\n"
-    for item_id, quantity in cart.items():
-        product = all_products.get(item_id, {"name": "Неизвестный товар", "price": 0})
-        response_text += f"• {product['name']} x {quantity} шт. = {product['price'] * quantity} руб.\n"
-    
-    response_text += f"\nСтоимость товаров: {items_price} руб.\n"
-    if discount_amount > 0:
-        response_text += f"Скидка по промокоду '{promocode}': -{discount_amount:.2f} руб.\n"
-    if delivery_cost > 0:
-        response_text += f"Стоимость доставки: {delivery_cost} руб.\n"
-
-    response_text += f"\n<b>Способ получения:</b> {shipping_method}"
-    if address:
-        response_text += f"\n<b>Адрес доставки:</b> {address}"
-    response_text += f"\n<b>Итого к оплате: {total_price:.2f} руб.</b>"
+    discount_amount = (user_data.get('items_price', 0) * user_data.get('discount_percent', 0)) / 100
 
     # Сохраняем заказ в "базу данных"
     order_details = {
-        "cart": cart, "items_price": items_price, "promocode": promocode, 
-        "discount_amount": discount_amount, "delivery_cost": delivery_cost,
-        "total_price": total_price, "shipping_method": shipping_method
+        "cart": cart, "items_price": user_data.get('items_price', 0), 
+        "promocode": promocode, "discount_amount": discount_amount, 
+        "delivery_cost": user_data.get('delivery_cost', 0),
+        "total_price": user_data.get('items_price', 0) - discount_amount + user_data.get('delivery_cost', 0), 
+        "shipping_method": user_data.get('shipping_method', 'Не указан')
     }
-    if address:
+    if address := user_data.get('address'):
         order_details["address"] = address
     new_order = await add_order_to_db(
         user_id=user.id,
@@ -134,6 +170,7 @@ async def _finalize_order(message: Message, user: User, state: FSMContext, bot: 
     if promocode and discount_amount > 0:
         await increment_promocode_usage(promocode)
 
+    response_text = _build_user_confirmation_text(user_data, all_products)
     # Отправляем подтверждение пользователю
     if is_callback:
         await message.edit_text(response_text)
@@ -143,29 +180,7 @@ async def _finalize_order(message: Message, user: User, state: FSMContext, bot: 
     await state.clear()
 
     # Уведомляем администратора
-    if ADMIN_IDS:
-        admin_text = f"🔔 <b>Новый заказ #{new_order['id']}!</b>\n\n<b>От:</b> {user.full_name} (ID: <code>{user.id}</code>)\n"
-        admin_text += f"<b>Username:</b> @{user.username or 'не указан'}\n\n<b>Состав заказа:</b>\n"
-        for item_id, quantity in cart.items():
-            product = all_products.get(item_id, {"name": "Неизвестный товар"})
-            admin_text += f"• {product['name']} x {quantity} шт.\n"
-        if discount_amount > 0:
-            admin_text += f"\n<b>Промокод:</b> {promocode} (-{discount_amount:.2f} руб.)"
-        if delivery_cost > 0:
-            admin_text += f"\n<b>Доставка:</b> {delivery_cost} руб."
-        admin_text += f"\n<b>Способ получения:</b> {shipping_method}"
-        if address:
-            admin_text += f"\n<b>Адрес доставки:</b> {address}"
-        admin_text += f"\n<b>Итого: {total_price:.2f} руб.</b>"
-        
-        for admin_id in ADMIN_IDS:
-            try:
-                await bot.send_message(
-                    admin_id, admin_text, reply_markup=get_new_order_admin_keyboard()
-                )
-                logger.info(f"Admin {admin_id} has been notified about the new order from user {user.id}.")
-            except Exception as e:
-                logger.error(f"Failed to send notification to admin {admin_id}: {e}")
+    await _notify_admins_of_new_order(bot, user, new_order, all_products)
 
 
 @router.callback_query(OrderStates.choosing_shipping, F.data.startswith("shipping_"))
