@@ -12,32 +12,23 @@ logger = logging.getLogger(__name__)
 DATA_DIR = "data"
 BOOKINGS_FILE = os.path.join(DATA_DIR, "bookings.json")
 ORDERS_FILE = os.path.join(DATA_DIR, "orders.json")
-BLOCKED_USERS_FILE = os.path.join(DATA_DIR, "blocked_users.json")
 PRODUCTS_FILE = os.path.join(DATA_DIR, "products.json")
 PRICES_FILE = os.path.join(DATA_DIR, "prices.json")
-BLOCKED_DATES_FILE = os.path.join(DATA_DIR, "blocked_dates.json")
-CANDIDATES_FILE = os.path.join(DATA_DIR, "candidates.json")
 
 # Асинхронная блокировка для предотвращения гонки данных при записи в файлы
 file_locks = {
     BOOKINGS_FILE: asyncio.Lock(),
     ORDERS_FILE: asyncio.Lock(),
-    BLOCKED_USERS_FILE: asyncio.Lock(),
     PRODUCTS_FILE: asyncio.Lock(),
     PRICES_FILE: asyncio.Lock(),
-    BLOCKED_DATES_FILE: asyncio.Lock(),
-    CANDIDATES_FILE: asyncio.Lock(),
 }
 
 # Словарь для определения, какой пустой тип данных возвращать для каждого файла
 _DEFAULT_EMPTY_VALUES = {
     BOOKINGS_FILE: [],
     ORDERS_FILE: [],
-    BLOCKED_USERS_FILE: [],
     PRODUCTS_FILE: {},
     PRICES_FILE: {},
-    BLOCKED_DATES_FILE: [],
-    CANDIDATES_FILE: [],
 }
 
 async def _read_data(file_path: str) -> Any:
@@ -90,12 +81,6 @@ async def ensure_data_files_exist():
         await _write_data(BOOKINGS_FILE, [])
     if not os.path.exists(ORDERS_FILE):
         await _write_data(ORDERS_FILE, [])
-    if not os.path.exists(BLOCKED_USERS_FILE):
-        await _write_data(BLOCKED_USERS_FILE, [])
-    if not os.path.exists(BLOCKED_DATES_FILE):
-        await _write_data(BLOCKED_DATES_FILE, [])
-    if not os.path.exists(CANDIDATES_FILE):
-        await _write_data(CANDIDATES_FILE, [])
     if not os.path.exists(PRICES_FILE):
         initial_prices = {
             "polishing": {
@@ -169,47 +154,6 @@ async def ensure_data_files_exist():
 
 
 
-# --- Функции для работы с кандидатами ---
-
-async def get_all_candidates() -> list[dict]:
-    """Загружает всех кандидатов из файла."""
-    return await _read_data(CANDIDATES_FILE)
-
-
-async def add_candidate_to_db(user_id: int, user_full_name: str, user_username: str | None, message_text: str, file_id: str | None, file_name: str | None) -> dict:
-    """Добавляет нового кандидата в файл."""
-    all_candidates = await get_all_candidates()
-    max_id = max((c.get('id', 0) for c in all_candidates), default=0)
-    new_candidate = {
-        'id': max_id + 1,
-        'user_id': user_id,
-        'user_full_name': user_full_name,
-        'user_username': user_username,
-        'message_text': message_text,
-        'file_id': file_id,
-        'file_name': file_name,
-        'received_at': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    }
-    all_candidates.append(new_candidate)
-    await _write_data(CANDIDATES_FILE, all_candidates)
-    logger.info(f"User {user_id} submitted a new job application with ID {new_candidate['id']}")
-    return new_candidate
-
-
-async def delete_candidate_in_db(candidate_id: int) -> dict | None:
-    """Удаляет кандидата по ID."""
-    all_candidates = await get_all_candidates()
-    candidate_to_delete = next((c for c in all_candidates if c.get('id') == candidate_id), None)
-
-    if not candidate_to_delete:
-        logger.warning(f"Admin attempt to delete non-existent candidate {candidate_id}.")
-        return None
-
-    new_candidates_list = [c for c in all_candidates if c.get('id') != candidate_id]
-    await _write_data(CANDIDATES_FILE, new_candidates_list)
-    logger.info(f"Candidate {candidate_id} was deleted by admin.")
-    return candidate_to_delete
-
 # --- Функции для работы с товарами и промокодами ---
 
 async def get_all_products() -> dict:
@@ -226,27 +170,30 @@ async def update_prices(new_prices_data: dict) -> None:
     await _write_data(PRICES_FILE, new_prices_data)
 
 
-async def get_blocked_dates() -> list[str]:
-    """Возвращает список заблокированных дат в формате 'dd.mm.yyyy'."""
-    return await _read_data(BLOCKED_DATES_FILE)
-
-
 async def add_blocked_date(date_str: str) -> None:
-    """Добавляет дату в список заблокированных."""
-    blocked_dates = await get_blocked_dates()
-    if date_str not in blocked_dates:
-        blocked_dates.append(date_str)
-        await _write_data(BLOCKED_DATES_FILE, sorted(blocked_dates))
-        logger.info(f"Date {date_str} has been blocked by admin.")
-
+    """Добавляет дату в список заблокированных в БД."""
+    pool = await get_pool()
+    # TO_DATE преобразует строку в тип DATE, который хранится в БД
+    sql = "INSERT INTO blocked_dates (blocked_date) VALUES (TO_DATE($1, 'DD.MM.YYYY')) ON CONFLICT DO NOTHING;"
+    async with pool.acquire() as connection:
+        await connection.execute(sql, date_str)
+    logger.info(f"Date {date_str} has been blocked by admin.")
 
 async def remove_blocked_date(date_str: str) -> None:
-    """Удаляет дату из списка заблокированных."""
-    blocked_dates = await get_blocked_dates()
-    if date_str in blocked_dates:
-        blocked_dates.remove(date_str)
-        await _write_data(BLOCKED_DATES_FILE, sorted(blocked_dates))
-        logger.info(f"Date {date_str} has been unblocked by admin.")
+    """Удаляет дату из списка заблокированных в БД."""
+    pool = await get_pool()
+    sql = "DELETE FROM blocked_dates WHERE blocked_date = TO_DATE($1, 'DD.MM.YYYY');"
+    async with pool.acquire() as connection:
+        await connection.execute(sql, date_str)
+    logger.info(f"Date {date_str} has been unblocked by admin.")
+
+async def get_blocked_dates() -> list[str]:
+    """Возвращает список заблокированных дат из БД в формате 'dd.mm.yyyy'."""
+    pool = await get_pool()
+    sql = "SELECT TO_CHAR(blocked_date, 'DD.MM.YYYY') as blocked_date FROM blocked_dates;"
+    async with pool.acquire() as connection:
+        records = await connection.fetch(sql)
+        return [rec['blocked_date'] for rec in records]
 
 # --- Новые функции для работы с промокодами через PostgreSQL ---
 
@@ -545,23 +492,84 @@ async def update_user_full_name(user_id: int, new_name: str) -> bool:
 
     return updated
 
+
+# --- Новые функции для работы с кандидатами через PostgreSQL ---
+
+async def get_all_candidates() -> list[dict]:
+    """Загружает всех кандидатов из базы данных."""
+    pool = await get_pool()
+    sql = "SELECT * FROM candidates ORDER BY received_at DESC;"
+    async with pool.acquire() as connection:
+        records = await connection.fetch(sql)
+        # Преобразуем для совместимости, т.к. в старом коде id - это 'id', а не 'candidate_id'
+        return [{**rec, 'id': rec['candidate_id']} for rec in records]
+
+async def add_candidate_to_db(user_id: int, user_full_name: str, user_username: str | None, message_text: str, file_id: str | None, file_name: str | None) -> dict:
+    """Добавляет нового кандидата в базу данных."""
+    pool = await get_pool()
+    sql = """
+        INSERT INTO candidates (user_id, full_name, username, message_text, file_id, file_name)
+        VALUES ($1, $2, $3, $4, $5, $6)
+        RETURNING candidate_id, received_at;
+    """
+    async with pool.acquire() as connection:
+        # Убедимся, что пользователь существует
+        await connection.execute(
+            "INSERT INTO users (user_id, full_name, username) VALUES ($1, $2, $3) ON CONFLICT (user_id) DO NOTHING;",
+            user_id, user_full_name, user_username
+        )
+        record = await connection.fetchrow(sql, user_id, user_full_name, user_username, message_text, file_id, file_name)
+
+    new_candidate = {
+        'id': record['candidate_id'], 'user_id': user_id, 'user_full_name': user_full_name,
+        'user_username': user_username, 'message_text': message_text, 'file_id': file_id,
+        'file_name': file_name, 'received_at': record['received_at'].strftime("%Y-%m-%d %H:%M:%S")
+    }
+    logger.info(f"User {user_id} submitted a new job application with ID {new_candidate['id']}")
+    return new_candidate
+
+async def delete_candidate_in_db(candidate_id: int) -> dict | None:
+    """Удаляет кандидата по ID из базы данных."""
+    pool = await get_pool()
+    sql = "DELETE FROM candidates WHERE candidate_id = $1 RETURNING *;"
+    async with pool.acquire() as connection:
+        deleted_record = await connection.fetchrow(sql, candidate_id)
+
+    if deleted_record:
+        logger.info(f"Candidate {candidate_id} was deleted by admin.")
+        return {**deleted_record, 'id': deleted_record['candidate_id']}
+    else:
+        logger.warning(f"Admin attempt to delete non-existent candidate {candidate_id}.")
+        return None
 async def get_blocked_users() -> list[int]:
-    """Возвращает список ID заблокированных пользователей."""
-    return await _read_data(BLOCKED_USERS_FILE)
+    """Возвращает список ID заблокированных пользователей из базы данных."""
+    pool = await get_pool()
+    sql = "SELECT user_id FROM users WHERE is_blocked = TRUE;"
+    async with pool.acquire() as connection:
+        records = await connection.fetch(sql)
+        return [rec['user_id'] for rec in records]
 
 
-async def block_user(user_id: int):
-    """Добавляет пользователя в черный список."""
-    blocked_users = await get_blocked_users()
-    if user_id not in blocked_users:
-        blocked_users.append(user_id)
-        await _write_data(BLOCKED_USERS_FILE, blocked_users)
-        logger.info(f"User {user_id} has been blocked.")
+async def block_user(user_id: int, user_full_name: str = "N/A"):
+    """Блокирует пользователя, устанавливая флаг is_blocked в TRUE."""
+    pool = await get_pool()
+    # Мы используем ON CONFLICT, чтобы команда не падала, если пользователя еще нет в таблице.
+    # В реальном приложении пользователь, скорее всего, уже будет в базе.
+    sql = """
+        INSERT INTO users (user_id, full_name, is_blocked)
+        VALUES ($1, $2, TRUE)
+        ON CONFLICT (user_id) DO UPDATE SET
+            is_blocked = TRUE;
+    """
+    async with pool.acquire() as connection:
+        await connection.execute(sql, user_id, user_full_name)
+    logger.info(f"User {user_id} has been blocked.")
 
 
 async def unblock_user(user_id: int):
-    """Удаляет пользователя из черного списка."""
-    blocked_users = await get_blocked_users()
-    if user_id in blocked_users:
-        blocked_users.remove(user_id)
-        await _write_data(BLOCKED_USERS_FILE, blocked_users)
+    """Разблокирует пользователя, устанавливая флаг is_blocked в FALSE."""
+    pool = await get_pool()
+    sql = "UPDATE users SET is_blocked = FALSE WHERE user_id = $1;"
+    async with pool.acquire() as connection:
+        await connection.execute(sql, user_id)
+    logger.info(f"User {user_id} has been unblocked.")
