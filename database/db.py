@@ -12,14 +12,12 @@ logger = logging.getLogger(__name__)
 DATA_DIR = "data"
 BOOKINGS_FILE = os.path.join(DATA_DIR, "bookings.json")
 ORDERS_FILE = os.path.join(DATA_DIR, "orders.json")
-PRODUCTS_FILE = os.path.join(DATA_DIR, "products.json")
 PRICES_FILE = os.path.join(DATA_DIR, "prices.json")
 
 # Асинхронная блокировка для предотвращения гонки данных при записи в файлы
 file_locks = {
     BOOKINGS_FILE: asyncio.Lock(),
     ORDERS_FILE: asyncio.Lock(),
-    PRODUCTS_FILE: asyncio.Lock(),
     PRICES_FILE: asyncio.Lock(),
 }
 
@@ -27,7 +25,6 @@ file_locks = {
 _DEFAULT_EMPTY_VALUES = {
     BOOKINGS_FILE: [],
     ORDERS_FILE: [],
-    PRODUCTS_FILE: {},
     PRICES_FILE: {},
 }
 
@@ -116,49 +113,94 @@ async def ensure_data_files_exist():
             "wrapping": 50000, "washing": 1500, "glass_polishing": 4000,
         }
         await _write_data(PRICES_FILE, initial_prices)
-    if not os.path.exists(PRODUCTS_FILE):
-        initial_products = {
-          "autochemistry": {
-            "name": "Автохимия",
-            "products": [
-              {
-                "id": "shampoo_500",
-                "name": "Супер-шампунь для авто",
-                "price": 500,
-                "description": "Концентрированный шампунь с воском. Придает блеск и защищает ЛКП. Объем 500 мл.",
-                "imageUrl": "https://i.imgur.com/example1.png"
-              },
-              {
-                "id": "polish_750",
-                "name": "Полироль для кузова 'Антицарапин'",
-                "price": 750,
-                "description": "Скрывает мелкие царапины и потертости, восстанавливает глубину цвета.",
-                "imageUrl": "https://i.imgur.com/example2.png"
-              }
-            ]
-          },
-          "tools": {
-            "name": "Инструменты и аксессуары",
-            "products": [
-              {
-                "id": "microfiber_250",
-                "name": "Волшебная микрофибра (3 шт.)",
-                "price": 250,
-                "description": "Набор из трех микрофибровых полотенец разной плотности для сушки, полировки и уборки салона.",
-                "imageUrl": "https://i.imgur.com/example3.png"
-              }
-            ]
-          }
+    await _seed_initial_products()
+
+
+async def _seed_initial_products():
+    """Наполняет таблицы товаров и категорий начальными данными, если они пусты."""
+    pool = await get_pool()
+    async with pool.acquire() as connection:
+        count = await connection.fetchval("SELECT COUNT(*) FROM products")
+        if count > 0:
+            return
+
+        logger.info("Таблицы товаров пусты. Наполняем начальными данными...")
+        initial_products_data = {
+            "autochemistry": {
+                "name": "Автохимия",
+                "products": [
+                    {
+                        "id": "shampoo_500", "name": "Супер-шампунь для авто", "price": 500,
+                        "description": "Концентрированный шампунь с воском. Придает блеск и защищает ЛКП. Объем 500 мл.",
+                        "image_url": "https://i.imgur.com/example1.png"
+                    },
+                    {
+                        "id": "polish_750", "name": "Полироль для кузова 'Антицарапин'", "price": 750,
+                        "description": "Скрывает мелкие царапины и потертости, восстанавливает глубину цвета.",
+                        "image_url": "https://i.imgur.com/example2.png"
+                    }
+                ]
+            },
+            "tools": {
+                "name": "Инструменты и аксессуары",
+                "products": [
+                    {
+                        "id": "microfiber_250", "name": "Волшебная микрофибра (3 шт.)", "price": 250,
+                        "description": "Набор из трех микрофибровых полотенец разной плотности для сушки, полировки и уборки салона.",
+                        "image_url": "https://i.imgur.com/example3.png"
+                    }
+                ]
+            }
         }
-        await _write_data(PRODUCTS_FILE, initial_products)
+
+        async with connection.transaction():
+            for category_id, category_data in initial_products_data.items():
+                await connection.execute(
+                    "INSERT INTO product_categories (id, name) VALUES ($1, $2) ON CONFLICT (id) DO NOTHING",
+                    category_id, category_data['name']
+                )
+                for product in category_data['products']:
+                    await connection.execute(
+                        """
+                        INSERT INTO products (id, name, price, description, image_url, category_id, subcategory, detail_images)
+                        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                        """,
+                        product['id'],
+                        product['name'],
+                        product['price'],
+                        product.get('description'),
+                        product.get('image_url'),
+                        category_id,
+                        product.get('subcategory'),
+                        json.dumps(product.get('detail_images')) if product.get('detail_images') else None
+                    )
+        logger.info("Начальные данные для товаров успешно загружены в базу данных.")
 
 
 
 # --- Функции для работы с товарами и промокодами ---
 
-async def get_all_products() -> dict:
-    """Читает все товары из файла."""
-    return await _read_data(PRODUCTS_FILE)
+async def get_all_products() -> list[dict]:
+    """Читает все товары из базы данных, объединяя с категориями."""
+    pool = await get_pool()
+    sql = """
+        SELECT
+            p.id, p.name, p.price, p.description, p.image_url, p.detail_images, p.subcategory,
+            pc.name as category
+        FROM products p
+        JOIN product_categories pc ON p.category_id = pc.id
+        ORDER BY pc.name, p.subcategory, p.name;
+    """
+    async with pool.acquire() as connection:
+        records = await connection.fetch(sql)
+        # Преобразуем asyncpg.Record в словари и парсим JSONB поля
+        products = []
+        for rec in records:
+            product_dict = dict(rec)
+            if product_dict.get('detail_images') and isinstance(product_dict['detail_images'], str):
+                product_dict['detail_images'] = json.loads(product_dict['detail_images'])
+            products.append(product_dict)
+        return products
 
 
 async def get_all_prices() -> dict:
@@ -248,14 +290,14 @@ async def increment_promocode_usage(code: str) -> None:
 
 
 async def get_product_by_id(product_id: str) -> dict | None:
-    """Ищет товар по ID во всех категориях."""
-    products_db = await get_all_products()
-    for category_data in products_db.values():
-        for product in category_data.get('products', []):
-            if product.get('id') == product_id:
-                return product
-    return None
-
+    """Ищет товар по ID в базе данных."""
+    pool = await get_pool()
+    sql = "SELECT * FROM products WHERE id = $1;"
+    async with pool.acquire() as connection:
+        record = await connection.fetchrow(sql, product_id)
+        if record:
+            return dict(record)
+        return None
 
 # --- Функции для работы с записями (bookings) ---
 
