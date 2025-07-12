@@ -18,11 +18,8 @@ from config import (
 )
 from handlers import common, booking, webapp_shop, group_management, hiring, errors
 from handlers.admin import admin_router
-from database.db import (
-    get_all_promocodes, get_all_products, ensure_data_files_exist,
-    get_all_prices, update_prices
-)
 from database.pool import get_pool, close_pool
+from database.db_setup import init_db
 from utils.bot_instance import bot_instance
 from utils.constants import (CAR_SIZES, POLISHING_TYPES, CERAMICS_TYPES,
                              WRAPPING_TYPES, INTERIOR_TYPES, DIRT_LEVELS)
@@ -64,40 +61,6 @@ def setup_logging() -> None:
     file_handler.setFormatter(formatter)
     logger.addHandler(file_handler)
 
-async def _ensure_price_keys_exist():
-    """
-    Проверяет, что для всех услуг в `prices.json` есть запись.
-    Если нет, создает ее со структурой по умолчанию и нулевыми ценами.
-    Это позволяет админу редактировать цены на новые услуги через существующий интерфейс.
-    """
-    logger = logging.getLogger(__name__)
-    logger.info("Checking for missing price keys...")
-    prices = await get_all_prices()
-
-    default_structures = {
-        "washing": 0,
-        "glass_polishing": 0,
-        "polishing": {size: {ptype: 0 for ptype in POLISHING_TYPES} for size in CAR_SIZES},
-        "ceramics": {size: {ctype: 0 for ctype in CERAMICS_TYPES} for size in CAR_SIZES},
-        "wrapping": {size: {wtype: 0 for wtype in WRAPPING_TYPES} for size in CAR_SIZES},
-        "dry_cleaning": {size: {itype: {dlevel: 0 for dlevel in DIRT_LEVELS} for itype in INTERIOR_TYPES} for size in CAR_SIZES}
-    }
-
-    updated = False
-    # Итерируемся по ключам словаря default_structures как по источнику правды
-    for key in default_structures.keys():
-        if key not in prices:
-            logger.warning(f"Price key '{key}' is missing. Creating default structure.")
-            prices[key] = default_structures.get(key, 0)
-            updated = True
-
-    if updated:
-        await update_prices(prices)
-        logger.info("Successfully updated prices.json with missing keys.")
-    else:
-        logger.info("All price keys are present.")
-
-
 
 
 def _create_api_response(
@@ -121,6 +84,8 @@ async def products_api_handler(request: web.Request) -> web.Response:
     # Логируем origin входящего запроса для отладки CORS
     origin = request.headers.get('Origin')
     logger.info(f"API request for products from origin: {origin}, method: {request.method}")
+    # TODO: Переписать эту функцию для получения данных из БД
+    from database.db import get_all_products # Временный импорт
 
     logger.info("Processing GET request for products.")
     all_products = await get_all_products()
@@ -199,6 +164,8 @@ async def validate_promocode_handler(request: web.Request) -> web.Response:
     promocode = request.query.get('code', '').upper()
     origin = request.headers.get('Origin')
     logger.debug(f"API request to validate promocode '{promocode}' from origin: {origin}, method: {request.method}")
+    # TODO: Переписать эту функцию для получения данных из БД
+    from database.db import get_all_promocodes # Временный импорт
 
     # Guard Clause: Промокод не предоставлен или не существует
     if not promocode or promocode not in (promocodes_db := await get_all_promocodes()):
@@ -243,23 +210,9 @@ async def main() -> None:
     # Создаем пул соединений при старте
     await get_pool()
 
-    await ensure_data_files_exist()
+    # Инициализируем таблицы в базе данных
+    await init_db()
 
-    # Добавляем предварительную проверку синтаксиса products.json для более точной диагностики
-    try:
-        # Используем 'utf-8-sig', чтобы автоматически обработать BOM (частая проблема в Windows)
-        with open(os.path.join('data', 'products.json'), 'r', encoding='utf-8-sig') as f:
-            json.load(f)
-        logging.info("Pre-check of data/products.json syntax is successful.")
-    except json.JSONDecodeError as e:
-        logging.critical(f"FATAL ERROR in data/products.json: Invalid syntax at line {e.lineno} column {e.colno}. Details: {e.msg}")
-        logging.critical("The bot cannot start with a broken products file. Please fix the file and restart.")
-        return  # Останавливаем запуск, если JSON некорректен
-    except FileNotFoundError:
-        logging.critical("FATAL ERROR: data/products.json not found even after check. Please check permissions or file creation logic.")
-        return
-
-    await _ensure_price_keys_exist()
     logging.info("Запуск бота...")
 
     # Инициализация бота и диспетчера
