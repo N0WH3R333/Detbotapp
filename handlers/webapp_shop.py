@@ -113,24 +113,24 @@ async def _notify_admins_of_new_order(bot: Bot, user: User, order: dict, all_pro
     """Отправляет уведомление о новом заказе администраторам."""
     if not ADMIN_IDS: return
  
-    cart = new_order.get('cart', {})
-    discount_amount = new_order.get('discount_amount', 0)
-    delivery_cost = new_order.get('delivery_cost', 0)
+    cart = order.get('cart', {})
+    discount_amount = order.get('discount_amount', 0)
+    delivery_cost = order.get('delivery_cost', 0)
     
-    admin_text = (f"🔔 <b>Новый заказ #{new_order['id']}!</b>\n\n"
+    admin_text = (f"🔔 <b>Новый заказ #{order['id']}!</b>\n\n"
                   f"<b>От:</b> {user.full_name} (ID: <code>{user.id}</code>)\n"
                   f"<b>Username:</b> @{user.username or 'не указан'}\n\n<b>Состав заказа:</b>\n")
     for item_id, quantity in cart.items():
         product = all_products.get(item_id, {"name": "Неизвестный товар"})
         admin_text += f"• {product['name']} x {quantity} шт.\n"
     if discount_amount > 0:
-        admin_text += f"\n<b>Промокод:</b> {new_order.get('promocode')} (-{discount_amount:.2f} руб.)"
+        admin_text += f"\n<b>Промокод:</b> {order.get('promocode')} (-{discount_amount:.2f} руб.)"
     if delivery_cost > 0:
         admin_text += f"\n<b>Доставка:</b> {delivery_cost} руб."
-    admin_text += f"\n<b>Способ получения:</b> {new_order.get('shipping_method')}"
-    if address := new_order.get('address'):
+    admin_text += f"\n<b>Способ получения:</b> {order.get('shipping_method')}"
+    if address := order.get('address'):
         admin_text += f"\n<b>Адрес доставки:</b> {address}"
-    admin_text += f"\n<b>Итого: {new_order.get('total_price', 0):.2f} руб.</b>"
+    admin_text += f"\n<b>Итого: {order.get('total_price', 0):.2f} руб.</b>"
     
     for admin_id in ADMIN_IDS:
         try:
