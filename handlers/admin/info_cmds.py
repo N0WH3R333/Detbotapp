@@ -1,3 +1,4 @@
+import json
 import logging
 from aiogram import Router, Bot, F
 from aiogram.filters import Command
@@ -11,7 +12,13 @@ router = Router()
 
 def format_booking_details_for_admin(booking: dict) -> str:
     """Форматирует детальную информацию о записи для админа."""
-    details = booking.get('details_json', {})
+    # details_json из базы приходит как строка, ее нужно распарсить
+    details_raw = booking.get('details_json')
+    details = {}
+    if isinstance(details_raw, str):
+        details = json.loads(details_raw)
+    elif isinstance(details_raw, dict):
+        details = details_raw
     
     service_details_lines = []
     if car_size := details.get('car_size'):
