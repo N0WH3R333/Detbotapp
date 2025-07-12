@@ -14,6 +14,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let allProducts = {}; // Хранилище всех товаров по ID для быстрого доступа
     let currentGalleryImages = [];
     let currentImageIndex = 0;
+    let cart = {}; // Наша корзина { productId: quantity }
 
     // --- 1. Загрузка товаров с сервера ---
     async function fetchProducts() {
@@ -111,7 +112,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const addButton = document.createElement('button');
         addButton.className = 'add-to-cart-btn';
         addButton.textContent = 'В корзину';
-        // Здесь будет логика добавления в корзину
+        addButton.addEventListener('click', (e) => { e.stopPropagation(); addToCart(product.id); });
 
         info.appendChild(name);
         info.appendChild(price);
@@ -148,6 +149,44 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function showNextImage() { currentImageIndex = (currentImageIndex + 1) % currentGalleryImages.length; updateGalleryView(); }
     function showPrevImage() { currentImageIndex = (currentImageIndex - 1 + currentGalleryImages.length) % currentGalleryImages.length; updateGalleryView(); }
+
+    // --- 5. Логика корзины ---
+    function addToCart(productId) {
+        if (cart[productId]) {
+            cart[productId]++;
+        } else {
+            cart[productId] = 1;
+        }
+        tg.HapticFeedback.impactOccurred('light');
+        updateMainButton();
+    }
+
+    function calculateTotalPrice() {
+        let total = 0;
+        for (const productId in cart) {
+            total += allProducts[productId].price * cart[productId];
+        }
+        return total;
+    }
+
+    function updateMainButton() {
+        const totalPrice = calculateTotalPrice();
+        if (totalPrice > 0) {
+            tg.MainButton.setText(`Оформить заказ на ${totalPrice} руб.`);
+            tg.MainButton.show();
+        } else {
+            tg.MainButton.hide();
+        }
+    }
+
+    // Обработчик нажатия на главную кнопку
+    tg.onEvent('mainButtonClicked', () => {
+        const dataToSend = {
+            action: 'checkout',
+            cart: cart
+        };
+        tg.sendData(JSON.stringify(dataToSend));
+    });
 
     // --- Навешиваем обработчики событий ---
     closeModalBtn.addEventListener('click', closeGallery);
