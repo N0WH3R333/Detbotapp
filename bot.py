@@ -23,7 +23,10 @@ from database.db import (
     get_all_prices, update_prices
 )
 from utils.bot_instance import bot_instance
-from utils.constants import SERVICE_NAMES
+from utils.constants import (
+    SERVICE_NAMES, CAR_SIZES, POLISHING_TYPES, CERAMICS_TYPES,
+    WRAPPING_TYPES, INTERIOR_TYPES, DIRT_LEVELS
+)
 from middlewares.block_middleware import BlockMiddleware
 from utils.scheduler import scheduler, schedule_existing_reminders, schedule_reports
 
@@ -74,20 +77,13 @@ async def _ensure_price_keys_exist():
 
     all_service_keys = set(SERVICE_NAMES.keys())
     
-    car_sizes = ["small", "medium", "large"]
-    polishing_types = ["light_polishing", "deep_polishing", "presale_polishing"]
-    ceramics_types = ["presale_ceramics", "medium_ceramics", "long_ceramics"]
-    wrapping_types = ["full_wrapping", "local_wrapping"]
-    interior_types = ["fabric", "leather", "alcantara", "combined"]
-    dirt_levels = ["light", "medium", "strong"]
-
     default_structures = {
         "washing": 0,
         "glass_polishing": 0,
-        "polishing": {size: {ptype: 0 for ptype in polishing_types} for size in car_sizes},
-        "ceramics": {size: {ctype: 0 for ctype in ceramics_types} for size in car_sizes},
-        "wrapping": {size: {wtype: 0 for wtype in wrapping_types} for size in car_sizes},
-        "dry_cleaning": {size: {itype: {dlevel: 0 for dlevel in dirt_levels} for itype in interior_types} for size in car_sizes}
+        "polishing": {size: {ptype: 0 for ptype in POLISHING_TYPES} for size in CAR_SIZES},
+        "ceramics": {size: {ctype: 0 for ctype in CERAMICS_TYPES} for size in CAR_SIZES},
+        "wrapping": {size: {wtype: 0 for wtype in WRAPPING_TYPES} for size in CAR_SIZES},
+        "dry_cleaning": {size: {itype: {dlevel: 0 for dlevel in DIRT_LEVELS} for itype in INTERIOR_TYPES} for size in CAR_SIZES}
     }
 
     updated = False
