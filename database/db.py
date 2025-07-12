@@ -3,6 +3,7 @@ import json
 import logging
 import os
 from datetime import datetime
+import tempfile
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -13,6 +14,9 @@ ORDERS_FILE = os.path.join(DATA_DIR, "orders.json")
 BLOCKED_USERS_FILE = os.path.join(DATA_DIR, "blocked_users.json")
 PRODUCTS_FILE = os.path.join(DATA_DIR, "products.json")
 PROMOCODES_FILE = os.path.join(DATA_DIR, "promocodes.json")
+PRICES_FILE = os.path.join(DATA_DIR, "prices.json")
+BLOCKED_DATES_FILE = os.path.join(DATA_DIR, "blocked_dates.json")
+CANDIDATES_FILE = os.path.join(DATA_DIR, "candidates.json")
 
 # Асинхронная блокировка для предотвращения гонки данных при записи в файлы
 file_locks = {
@@ -21,8 +25,22 @@ file_locks = {
     BLOCKED_USERS_FILE: asyncio.Lock(),
     PRODUCTS_FILE: asyncio.Lock(),
     PROMOCODES_FILE: asyncio.Lock(),
+    PRICES_FILE: asyncio.Lock(),
+    BLOCKED_DATES_FILE: asyncio.Lock(),
+    CANDIDATES_FILE: asyncio.Lock(),
 }
 
+# Словарь для определения, какой пустой тип данных возвращать для каждого файла
+_DEFAULT_EMPTY_VALUES = {
+    BOOKINGS_FILE: [],
+    ORDERS_FILE: [],
+    BLOCKED_USERS_FILE: [],
+    PRODUCTS_FILE: {},
+    PROMOCODES_FILE: {},
+    PRICES_FILE: {},
+    BLOCKED_DATES_FILE: [],
+    CANDIDATES_FILE: [],
+}
 
 async def _read_data(file_path: str) -> Any:
     """Асинхронно читает данные из JSON файла с использованием блокировки."""
@@ -30,30 +48,39 @@ async def _read_data(file_path: str) -> Any:
     if not lock:
         raise ValueError(f"No lock found for file: {file_path}")
 
-    async with lock:
-        try:
-            if not os.path.exists(file_path):
-                return {} if file_path.endswith('s.json') and file_path not in [BLOCKED_USERS_FILE] else []
+    default_value = _DEFAULT_EMPTY_VALUES.get(file_path, [])
 
+    async with lock:
+        if not os.path.exists(file_path):
+            return default_value
+        try:
             with open(file_path, 'r', encoding='utf-8') as f:
-                return json.load(f)
+                data = json.load(f)
+                # Обработка случая, когда файл пуст, но существует
+                return data if data else default_value
         except json.JSONDecodeError:
             logger.error(f"Ошибка декодирования JSON в файле: {file_path}. Возвращен пустой объект.")
-            return {} if file_path.endswith('s.json') and file_path not in [BLOCKED_USERS_FILE] else []
-        except FileNotFoundError:
-            return {} if file_path.endswith('s.json') and file_path not in [BLOCKED_USERS_FILE] else []
+            return default_value
 
 
 async def _write_data(file_path: str, data: Any) -> None:
-    """Асинхронно записывает данные в JSON файл с использованием блокировки."""
+    """Асинхронно записывает данные в JSON файл с использованием блокировки и атомарной записи."""
     lock = file_locks.get(file_path)
     if not lock:
         raise ValueError(f"No lock found for file: {file_path}")
 
     async with lock:
         os.makedirs(os.path.dirname(file_path), exist_ok=True)
-        with open(file_path, 'w', encoding='utf-8') as f:
-            json.dump(data, f, ensure_ascii=False, indent=4)
+        # Используем временный файл и атомарное переименование для безопасной записи
+        temp_fd, temp_path = tempfile.mkstemp(dir=os.path.dirname(file_path))
+        try:
+            with os.fdopen(temp_fd, 'w', encoding='utf-8') as temp_f:
+                json.dump(data, temp_f, ensure_ascii=False, indent=4)
+            os.replace(temp_path, file_path)
+        except Exception as e:
+            logger.error(f"Ошибка при записи в файл {file_path}: {e}")
+            os.remove(temp_path) # Удаляем временный файл в случае ошибки
+            raise
 
 
 async def ensure_data_files_exist():
@@ -67,33 +94,132 @@ async def ensure_data_files_exist():
         await _write_data(ORDERS_FILE, [])
     if not os.path.exists(BLOCKED_USERS_FILE):
         await _write_data(BLOCKED_USERS_FILE, [])
+    if not os.path.exists(BLOCKED_DATES_FILE):
+        await _write_data(BLOCKED_DATES_FILE, [])
+    if not os.path.exists(CANDIDATES_FILE):
+        await _write_data(CANDIDATES_FILE, [])
+    if not os.path.exists(PRICES_FILE):
+        initial_prices = {
+            "polishing": {
+                "small": {"light_polishing": 3000, "deep_polishing": 6000, "presale_polishing": 2500},
+                "medium": {"light_polishing": 4000, "deep_polishing": 8000, "presale_polishing": 3500},
+                "large": {"light_polishing": 5000, "deep_polishing": 10000, "presale_polishing": 4500},
+            },
+            "ceramics": {
+                "small": {"presale_ceramics": 5000, "medium_ceramics": 10000, "long_ceramics": 15000},
+                "medium": {"presale_ceramics": 6000, "medium_ceramics": 12000, "long_ceramics": 18000},
+                "large": {"presale_ceramics": 7000, "medium_ceramics": 14000, "long_ceramics": 21000},
+            },
+            "dry_cleaning": {
+                "small": {
+                    "fabric": {"light": 2000, "medium": 3000, "strong": 4000},
+                    "leather": {"light": 2500, "medium": 3500, "strong": 4500},
+                    "alcantara": {"light": 3000, "medium": 4000, "strong": 5000},
+                    "combined": {"light": 2800, "medium": 3800, "strong": 4800},
+                },
+                "medium": {
+                    "fabric": {"light": 3000, "medium": 4000, "strong": 5000},
+                    "leather": {"light": 3500, "medium": 4500, "strong": 5500},
+                    "alcantara": {"light": 4000, "medium": 5000, "strong": 6000},
+                    "combined": {"light": 3800, "medium": 4800, "strong": 5800},
+                },
+                "large": {
+                    "fabric": {"light": 4000, "medium": 5000, "strong": 6000},
+                    "leather": {"light": 4500, "medium": 5500, "strong": 6500},
+                    "alcantara": {"light": 5000, "medium": 6000, "strong": 7000},
+                    "combined": {"light": 4800, "medium": 5800, "strong": 6800},
+                },
+            },
+            "wrapping": 50000, "washing": 1500, "glass_polishing": 4000,
+        }
+        await _write_data(PRICES_FILE, initial_prices)
     if not os.path.exists(PRODUCTS_FILE):
         initial_products = {
-            "autochemistry": {
-                "name": "Автохимия",
-                "products": {
-                    "shampoo_500": {"name": "Супер-шампунь для авто", "price": 500},
-                    "polish_750": {"name": "Полироль для кузова", "price": 750},
-                }
-            },
-            "autoaccessories": {
-                "name": "Автоаксессуары",
-                "products": {
-                    "microfiber_250": {"name": "Волшебная микрофибра (3 шт.)", "price": 250},
-                }
-            }
+          "autochemistry": {
+            "name": "Автохимия",
+            "products": [
+              {
+                "id": "shampoo_500",
+                "name": "Супер-шампунь для авто",
+                "price": 500,
+                "description": "Концентрированный шампунь с воском. Придает блеск и защищает ЛКП. Объем 500 мл.",
+                "imageUrl": "https://i.imgur.com/example1.png"
+              },
+              {
+                "id": "polish_750",
+                "name": "Полироль для кузова 'Антицарапин'",
+                "price": 750,
+                "description": "Скрывает мелкие царапины и потертости, восстанавливает глубину цвета.",
+                "imageUrl": "https://i.imgur.com/example2.png"
+              }
+            ]
+          },
+          "tools": {
+            "name": "Инструменты и аксессуары",
+            "products": [
+              {
+                "id": "microfiber_250",
+                "name": "Волшебная микрофибра (3 шт.)",
+                "price": 250,
+                "description": "Набор из трех микрофибровых полотенец разной плотности для сушки, полировки и уборки салона.",
+                "imageUrl": "https://i.imgur.com/example3.png"
+              }
+            ]
+          }
         }
         await _write_data(PRODUCTS_FILE, initial_products)
     if not os.path.exists(PROMOCODES_FILE):
         # Добавляем поля usage_limit и times_used.
         # usage_limit: null означает "без лимита".
         initial_promocodes = {
-            "SALE10": {"discount": 10, "start_date": "2024-01-01", "end_date": "2099-12-31", "usage_limit": None, "times_used": 0},
-            "LIMITED25": {"discount": 25, "start_date": "2024-01-01", "end_date": "2099-12-31", "usage_limit": 100, "times_used": 10}
+            "SALE10": {"type": "shop", "discount": 10, "start_date": "2024-01-01", "end_date": "2099-12-31", "usage_limit": None, "times_used": 0},
+            "LIMITED25": {"type": "shop", "discount": 25, "start_date": "2024-01-01", "end_date": "2099-12-31", "usage_limit": 100, "times_used": 10},
+            "DETAILING5": {"type": "detailing", "discount": 5, "start_date": "2024-01-01", "end_date": "2099-12-31", "usage_limit": None, "times_used": 0}
         }
         await _write_data(PROMOCODES_FILE, initial_promocodes)
 
 
+
+# --- Функции для работы с кандидатами ---
+
+async def get_all_candidates() -> list[dict]:
+    """Загружает всех кандидатов из файла."""
+    return await _read_data(CANDIDATES_FILE)
+
+
+async def add_candidate_to_db(user_id: int, user_full_name: str, user_username: str | None, message_text: str, file_id: str | None, file_name: str | None) -> dict:
+    """Добавляет нового кандидата в файл."""
+    all_candidates = await get_all_candidates()
+    max_id = max((c.get('id', 0) for c in all_candidates), default=0)
+    new_candidate = {
+        'id': max_id + 1,
+        'user_id': user_id,
+        'user_full_name': user_full_name,
+        'user_username': user_username,
+        'message_text': message_text,
+        'file_id': file_id,
+        'file_name': file_name,
+        'received_at': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    }
+    all_candidates.append(new_candidate)
+    await _write_data(CANDIDATES_FILE, all_candidates)
+    logger.info(f"User {user_id} submitted a new job application with ID {new_candidate['id']}")
+    return new_candidate
+
+
+async def delete_candidate_in_db(candidate_id: int) -> dict | None:
+    """Удаляет кандидата по ID."""
+    all_candidates = await get_all_candidates()
+    candidate_to_delete = next((c for c in all_candidates if c.get('id') == candidate_id), None)
+
+    if not candidate_to_delete:
+        logger.warning(f"Admin attempt to delete non-existent candidate {candidate_id}.")
+        return None
+
+    new_candidates_list = [c for c in all_candidates if c.get('id') != candidate_id]
+    await _write_data(CANDIDATES_FILE, new_candidates_list)
+    logger.info(f"Candidate {candidate_id} was deleted by admin.")
+    return candidate_to_delete
 
 # --- Функции для работы с товарами и промокодами ---
 
@@ -101,14 +227,47 @@ async def get_all_products() -> dict:
     """Читает все товары из файла."""
     return await _read_data(PRODUCTS_FILE)
 
+
+async def get_all_prices() -> dict:
+    """Читает все цены из файла."""
+    return await _read_data(PRICES_FILE)
+
+async def update_prices(new_prices_data: dict) -> None:
+    """Полностью перезаписывает файл с ценами."""
+    await _write_data(PRICES_FILE, new_prices_data)
+
 async def get_all_promocodes() -> dict:
     """Читает все промокоды из файла."""
     return await _read_data(PROMOCODES_FILE)
 
-async def add_promocode_to_db(code: str, discount: int, start_date: str, end_date: str, usage_limit: int | None) -> None:
+
+async def get_blocked_dates() -> list[str]:
+    """Возвращает список заблокированных дат в формате 'dd.mm.yyyy'."""
+    return await _read_data(BLOCKED_DATES_FILE)
+
+
+async def add_blocked_date(date_str: str) -> None:
+    """Добавляет дату в список заблокированных."""
+    blocked_dates = await get_blocked_dates()
+    if date_str not in blocked_dates:
+        blocked_dates.append(date_str)
+        await _write_data(BLOCKED_DATES_FILE, sorted(blocked_dates))
+        logger.info(f"Date {date_str} has been blocked by admin.")
+
+
+async def remove_blocked_date(date_str: str) -> None:
+    """Удаляет дату из списка заблокированных."""
+    blocked_dates = await get_blocked_dates()
+    if date_str in blocked_dates:
+        blocked_dates.remove(date_str)
+        await _write_data(BLOCKED_DATES_FILE, sorted(blocked_dates))
+        logger.info(f"Date {date_str} has been unblocked by admin.")
+
+async def add_promocode_to_db(code: str, discount: int, start_date: str, end_date: str, usage_limit: int | None, promo_type: str) -> None:
     """Добавляет или обновляет промокод в файле."""
     promocodes = await get_all_promocodes()
     promocodes[code.upper()] = {
+        "type": promo_type,
         "discount": discount,
         "start_date": start_date,
         "end_date": end_date,
@@ -133,10 +292,10 @@ async def increment_promocode_usage(code: str) -> None:
 async def get_product_by_id(product_id: str) -> dict | None:
     """Ищет товар по ID во всех категориях."""
     products_db = await get_all_products()
-    for category in products_db.values():
-        # Ищем товар в словаре 'products' текущей категории
-        if product_id in category.get('products', {}):
-            return category['products'][product_id]
+    for category_data in products_db.values():
+        for product in category_data.get('products', []):
+            if product.get('id') == product_id:
+                return product
     return None
 
 
@@ -334,6 +493,46 @@ async def get_all_unique_user_ids() -> set[int]:
 
     return user_ids
 
+
+async def get_all_unique_users() -> dict[int, dict]:
+    """Возвращает словарь всех уникальных пользователей с их данными."""
+    all_bookings = await get_all_bookings()
+    all_orders = await get_all_orders()
+    all_records = all_bookings + all_orders
+
+    users = {}
+    for record in all_records:
+        user_id = record.get('user_id')
+        if user_id and user_id not in users:
+            users[user_id] = {
+                'user_full_name': record.get('user_full_name'),
+                'user_username': record.get('user_username')
+            }
+    return users
+
+
+async def update_user_full_name(user_id: int, new_name: str) -> bool:
+    """Обновляет user_full_name для пользователя во всех записях и заказах."""
+    all_bookings = await get_all_bookings()
+    all_orders = await get_all_orders()
+    updated = False
+
+    for booking in all_bookings:
+        if booking.get('user_id') == user_id:
+            booking['user_full_name'] = new_name
+            updated = True
+
+    for order in all_orders:
+        if order.get('user_id') == user_id:
+            order['user_full_name'] = new_name
+            updated = True
+
+    if updated:
+        await _write_data(BOOKINGS_FILE, all_bookings)
+        await _write_data(ORDERS_FILE, all_orders)
+        logger.info(f"Updated full name for user {user_id} to '{new_name}'")
+
+    return updated
 
 async def get_blocked_users() -> list[int]:
     """Возвращает список ID заблокированных пользователей."""

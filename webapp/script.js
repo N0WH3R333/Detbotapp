@@ -1,111 +1,157 @@
-// Инициализируем WebApp
-const tg = window.Telegram.WebApp;
+document.addEventListener('DOMContentLoaded', () => {
+    const tg = window.Telegram.WebApp;
+    tg.ready();
+    tg.expand();
 
-// --- Данные о товарах ---
-const products = {
-    shampoo_500: { name: "Супер-шампунь для авто", price: 500 },
-    microfiber_250: { name: "Волшебная микрофибра", price: 250 },
-};
+    const catalogContainer = document.getElementById('catalog-container');
+    const modal = document.getElementById('gallery-modal');
+    const modalImage = document.getElementById('gallery-image');
+    const modalCounter = document.getElementById('gallery-counter');
+    const closeModalBtn = document.querySelector('.close-btn');
+    const prevBtn = document.querySelector('.prev-btn');
+    const nextBtn = document.querySelector('.next-btn');
 
-// --- Корзина ---
-let cart = {};
+    let allProducts = {}; // Хранилище всех товаров по ID для быстрого доступа
+    let currentGalleryImages = [];
+    let currentImageIndex = 0;
 
-// --- Функция для обновления вида корзины ---
-function updateCartView() {
-    const cartItemsContainer = document.getElementById('cart-items');
-    const totalPriceContainer = document.getElementById('total-price-container');
-    const promoContainer = document.getElementById('promo-container');
-    const totalPriceSpan = document.getElementById('total-price');
-    let total = 0;
+    // --- 1. Загрузка товаров с сервера ---
+    async function fetchProducts() {
+        // ВАЖНО: Укажите здесь ПОЛНЫЙ ПУБЛИЧНЫЙ АДРЕС вашего бота.
+        // Этот URL должен указывать на ваш бот, а не на Netlify!
+        // Его нужно получать из консоли cloudflared при каждом запуске.
+        const backendUrl = 'https://your-public-backend-url.trycloudflare.com'; // <-- ЗАМЕНИТЕ ЭТО
+        
+        const apiUrl = `${backendUrl}/api/products`; 
 
-    cartItemsContainer.innerHTML = ''; // Очищаем старое содержимое
+        // Лог для отладки, чтобы видеть, куда идет запрос
+        console.log(`Fetching products from: ${apiUrl}`);
 
-    const items = Object.keys(cart);
-
-    if (items.length === 0) {
-        cartItemsContainer.innerHTML = '<p>Корзина пуста</p>';
-        totalPriceContainer.style.display = 'none';
-        promoContainer.style.display = 'none';
-        tg.MainButton.hide(); // Скрываем главную кнопку, если корзина пуста
-        return;
-    }
-
-    items.forEach(itemId => {
-        const product = products[itemId];
-        const quantity = cart[itemId];
-        total += product.price * quantity;
-
-        const itemRow = document.createElement('div');
-        itemRow.className = 'cart-item-row';
-
-        const textSpan = document.createElement('span');
-        textSpan.innerText = `${product.name} x ${quantity} — ${product.price * quantity} руб.`;
-
-        const removeBtn = document.createElement('button');
-        removeBtn.innerText = 'Удалить';
-        removeBtn.className = 'remove-btn';
-        removeBtn.onclick = () => removeFromCart(itemId);
-
-        itemRow.appendChild(textSpan);
-        itemRow.appendChild(removeBtn);
-        cartItemsContainer.appendChild(itemRow);
-    });
-
-    totalPriceSpan.innerText = total;
-    totalPriceContainer.style.display = 'block';
-    promoContainer.style.display = 'block';
-
-    // Показываем и настраиваем главную кнопку
-    tg.MainButton.setText(`Оформить заказ на ${total} руб.`);
-    tg.MainButton.show();
-}
-
-// --- Функция добавления в корзину ---
-function addToCart(itemId) {
-    if (cart[itemId]) {
-        cart[itemId]++;
-    } else {
-        cart[itemId] = 1;
-    }
-    updateCartView();
-}
-
-// --- Функция удаления из корзины ---
-function removeFromCart(itemId) {
-    if (cart[itemId]) {
-        cart[itemId]--; // Уменьшаем количество
-        if (cart[itemId] <= 0) {
-            delete cart[itemId]; // Если количество 0, удаляем товар из корзины
+        try {
+            const response = await fetch(apiUrl);
+            if (!response.ok) {
+                throw new Error(`Ошибка сети: ${response.status}`);
+            }
+            const categories = await response.json();
+            renderCatalog(categories);
+        } catch (error) {
+            catalogContainer.innerHTML = `<div class="error-message">Не удалось загрузить товары. Попробуйте позже.</div>`;
+            console.error("Ошибка при загрузке товаров:", error);
         }
     }
-    updateCartView();
-}
 
-// --- Инициализация WebApp ---
-document.addEventListener('DOMContentLoaded', () => {
-    tg.ready(); // Сообщаем Telegram, что WebApp готов
-    tg.expand(); // Расширяем на весь экран
+    // --- 2. Отрисовка каталога ---
+    function renderCatalog(categories) {
+        catalogContainer.innerHTML = ''; // Очищаем загрузчик
+        if (!categories || categories.length === 0) {
+            catalogContainer.innerHTML = '<p class="error-message">Товары не найдены.</p>';
+            return;
+        }
 
-    // Отображаем имя пользователя
-    const user = tg.initDataUnsafe.user;
-    if (user && user.first_name) {
-        document.getElementById('user-name').innerText = user.first_name;
+        categories.forEach(category => {
+            const categoryElement = document.createElement('div');
+            categoryElement.className = 'category';
+            
+            const categoryTitle = document.createElement('h2');
+            categoryTitle.className = 'category-title';
+            categoryTitle.textContent = category.name;
+            categoryElement.appendChild(categoryTitle);
+
+            category.subcategories.forEach(subcategory => {
+                const subcategoryTitle = document.createElement('h3');
+                subcategoryTitle.className = 'subcategory-title';
+                subcategoryTitle.textContent = subcategory.name;
+                categoryElement.appendChild(subcategoryTitle);
+
+                const productsGrid = document.createElement('div');
+                productsGrid.className = 'products-grid';
+
+                subcategory.products.forEach(product => {
+                    allProducts[product.id] = product; // Сохраняем товар для галереи
+                    const productCard = createProductCard(product);
+                    productsGrid.appendChild(productCard);
+                });
+                categoryElement.appendChild(productsGrid);
+            });
+
+            catalogContainer.appendChild(categoryElement);
+        });
     }
 
-    // Навешиваем обработчики на кнопки "Добавить в корзину"
-    document.getElementById('add_shampoo').addEventListener('click', () => addToCart('shampoo_500'));
-    document.getElementById('add_microfiber').addEventListener('click', () => addToCart('microfiber_250'));
+    // --- 3. Создание карточки товара ---
+    function createProductCard(product) {
+        const card = document.createElement('div');
+        card.className = 'product-card';
 
-    // Обработчик для главной кнопки Telegram
-    tg.MainButton.onClick(() => {
-        const promocode = document.getElementById('promocode-input').value;
-        // При клике отправляем данные корзины в бот
-        tg.sendData(JSON.stringify({
-            action: 'checkout',
-            cart: cart,
-            promocode: promocode
-        }));
-    });
+        const imageContainer = document.createElement('div');
+        imageContainer.className = 'product-image-container';
+        imageContainer.addEventListener('click', () => openGallery(product.id));
+        
+        const image = document.createElement('img');
+        image.className = 'product-image';
+        image.src = product.imageUrl || ''; // Используем imageUrl, который отдает бот
+        image.alt = product.name;
+        image.onerror = () => { image.src = 'https://via.placeholder.com/150'; }; // Заглушка, если фото не загрузилось
+        
+        imageContainer.appendChild(image);
 
-    updateCartView(); // Первоначальное отображение корзины
+        const info = document.createElement('div');
+        info.className = 'product-info';
+
+        const name = document.createElement('p');
+        name.className = 'product-name';
+        name.textContent = product.name;
+
+        const price = document.createElement('p');
+        price.className = 'product-price';
+        price.textContent = `${product.price} руб.`;
+
+        const addButton = document.createElement('button');
+        addButton.className = 'add-to-cart-btn';
+        addButton.textContent = 'В корзину';
+        // Здесь будет логика добавления в корзину
+
+        info.appendChild(name);
+        info.appendChild(price);
+        info.appendChild(addButton);
+        
+        card.appendChild(imageContainer);
+        card.appendChild(info);
+
+        return card;
+    }
+
+    // --- 4. Логика галереи ---
+    function openGallery(productId) {
+        const product = allProducts[productId];
+        if (!product) return;
+
+        // Собираем все фото: главное + детальные
+        currentGalleryImages = [product.imageUrl, ...(product.detailImages || [])].filter(Boolean);
+        if (currentGalleryImages.length === 0) return;
+
+        currentImageIndex = 0;
+        updateGalleryView();
+        modal.style.display = 'flex';
+    }
+
+    function closeGallery() { modal.style.display = 'none'; }
+
+    function updateGalleryView() {
+        modalImage.src = currentGalleryImages[currentImageIndex];
+        modalCounter.textContent = `${currentImageIndex + 1} / ${currentGalleryImages.length}`;
+        prevBtn.style.display = currentGalleryImages.length > 1 ? 'block' : 'none';
+        nextBtn.style.display = currentGalleryImages.length > 1 ? 'block' : 'none';
+    }
+
+    function showNextImage() { currentImageIndex = (currentImageIndex + 1) % currentGalleryImages.length; updateGalleryView(); }
+    function showPrevImage() { currentImageIndex = (currentImageIndex - 1 + currentGalleryImages.length) % currentGalleryImages.length; updateGalleryView(); }
+
+    // --- Навешиваем обработчики событий ---
+    closeModalBtn.addEventListener('click', closeGallery);
+    nextBtn.addEventListener('click', showNextImage);
+    prevBtn.addEventListener('click', showPrevImage);
+
+    // --- Запускаем загрузку ---
+    fetchProducts();
 });

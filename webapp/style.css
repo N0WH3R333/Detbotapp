@@ -1,0 +1,168 @@
+/* Basic Styles */
+:root {
+    --tg-theme-bg-color: #f4f4f9;
+    --tg-theme-text-color: #1c1c1e;
+    --tg-theme-button-color: #007aff;
+    --tg-theme-button-text-color: #ffffff;
+    --tg-theme-section-bg-color: #ffffff;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    margin: 0;
+    padding: 10px;
+    background-color: var(--tg-theme-bg-color);
+    color: var(--tg-theme-text-color);
+}
+
+/* Loader */
+.loader, .error-message {
+    text-align: center;
+    padding: 50px 20px;
+    font-size: 16px;
+    color: #8e8e93;
+}
+
+/* Catalog Structure */
+.category {
+    margin-bottom: 25px;
+}
+
+.category-title {
+    font-size: 22px;
+    font-weight: 700;
+    margin-bottom: 12px;
+    padding-left: 5px;
+}
+
+.subcategory-title {
+    font-size: 18px;
+    font-weight: 600;
+    margin-top: 15px;
+    margin-bottom: 15px;
+    color: #3c3c43;
+    padding-left: 5px;
+}
+
+/* Product Grid */
+.products-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr); /* Всегда 2 колонки */
+    gap: 10px;
+}
+
+/* Product Card */
+.product-card {
+    border-radius: 12px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    background-color: var(--tg-theme-section-bg-color);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+
+.product-image-container {
+    width: 100%;
+    padding-top: 100%; /* Создает квадратную область для фото */
+    position: relative;
+    cursor: pointer;
+}
+
+.product-image {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover; /* ОБРЕЗАЕТ фото, чтобы оно красиво заполнило квадрат */
+}
+
+.product-info {
+    padding: 12px;
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    text-align: center;
+}
+
+.product-name {
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 1.3;
+    margin-bottom: 8px;
+    min-height: 36px; /* Резервирует место для 2-3 строк названия */
+}
+
+.product-price {
+    font-size: 17px;
+    font-weight: 700;
+    margin-bottom: 12px;
+}
+
+.add-to-cart-btn {
+    width: 100%;
+    padding: 10px;
+    border: none;
+    border-radius: 8px;
+    background-color: var(--tg-theme-button-color);
+    color: var(--tg-theme-button-text-color);
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 15px;
+}
+
+/* Gallery Modal */
+.modal {
+    display: none; /* Скрыто по умолчанию */
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.9);
+    justify-content: center;
+    align-items: center;
+}
+
+.modal-content {
+    position: relative;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    height: 100%;
+}
+
+#gallery-image {
+    max-width: 95vw;
+    max-height: 85vh;
+    object-fit: contain; /* ПОКАЗЫВАЕТ фото полностью, без обрезки */
+}
+
+.close-btn, .prev-btn, .next-btn {
+    cursor: pointer;
+    position: absolute;
+    color: white;
+    font-weight: bold;
+    font-size: 30px;
+    user-select: none;
+    padding: 16px;
+    z-index: 1001;
+}
+
+.close-btn { top: 0; right: 10px; font-size: 45px; }
+.prev-btn { left: 0; top: 50%; transform: translateY(-50%); }
+.next-btn { right: 0; top: 50%; transform: translateY(-50%); }
+
+#gallery-counter {
+    position: absolute;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: white;
+    font-size: 16px;
+    background-color: rgba(0,0,0,0.5);
+    padding: 5px 10px;
+    border-radius: 10px;
+}

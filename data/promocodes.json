@@ -1,0 +1,16 @@
+{
+    "SALE10": {
+        "discount": 10,
+        "start_date": "2024-01-01",
+        "end_date": "2099-12-31",
+        "usage_limit": null,
+        "times_used": 0
+    },
+    "LIMITED25": {
+        "discount": 25,
+        "start_date": "2024-01-01",
+        "end_date": "2099-12-31",
+        "usage_limit": 100,
+        "times_used": 10
+    }
+}

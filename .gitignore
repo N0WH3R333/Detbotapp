@@ -10,9 +10,6 @@ env/
 .idea/
 __pycache__/
 
-# Local data storage
-data/
-
 # Log files
 logs/
 *.log

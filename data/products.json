@@ -1,0 +1,278 @@
+{
+  "EMIK": {
+    "id": "EMIK",
+    "name": "Эмульсионный шампунь для первой фазы мойки",
+    "price": 1,
+    "category": "Автохимия",
+    "subcategory": "продукция SEVEN",
+    "image_url": "https://i.postimg.cc/FsfrgLXv/IMG-6709.jpg",
+    "description": "Модификация: 530мл &lt;br&gt; Особенности: нет &lt;br&gt; Характеристики: эмульсионный шампунь для бесконтактной мойки автомобиля. &lt;br&gt; Не оказывает негативного действия на ЛКП кузова, пластик, детали из сплавов цветных металлов. &lt;br&gt; Благодаря высокому содержанию комплексообразователей отлично работает в жесткой воде. &lt;br&gt; Содержание свободной щелочи менее 1%.",
+    "detail_images": [
+      "https://i.postimg.cc/FsfrgLXv/IMG-6709.jpg",
+      "https://i.postimg.cc/7LqrcCdf/IMG-6711.jpg",
+      "https://i.postimg.cc/zD4BQjjv/IMG-6710.jpg"
+    ]
+  },
+  "FOMIK": {
+    "id": "FOMIK",
+    "name": "Высокопенный шампунь для первой фазы мойки FOMIK",
+    "price": 1,
+    "category": "Автохимия",
+    "subcategory": "продукция SEVEN",
+    "image_url": "https://i.postimg.cc/3J6gnmyF/IMG-6735.jpg",
+    "description": "Модификация: 530мл &lt;br&gt; Особенности: нет &lt;br&gt; Характеристики: высокопенный шампунь для бесконтактной мойки автомобиля. &lt;br&gt; Не оказывает негативного действия на ЛКП кузова, пластик, детали из сплавов цветных металлов. &lt;br&gt; Благодаря высокому содержанию комплексообразователей отлично работает в жесткой воде. &lt;br&gt; Содержание свободной щелочи менее 1%.",
+    "detail_images": [
+      "https://i.postimg.cc/3J6gnmyF/IMG-6735.jpg",
+      "https://i.postimg.cc/SNwMW45Z/IMG-6737.jpg",
+      "https://i.postimg.cc/431Hk93M/IMG-6736.jpg"
+    ]
+  },
+  "ACID FASE": {
+    "id": "ACID FASE",
+    "name": "Кислотный шампунь для второй фазы мойки ACID FASE",
+    "price": 7888850,
+    "category": "Автохимия",
+    "subcategory": "продукция SEVEN",
+    "image_url": "https://i.postimg.cc/JnV8q6mC/IMG-6756.jpg",
+    "description": "Модификация: 530мл &lt;br&gt; Особенности: разводить 1\\10 &lt;br&gt; Характеристики: ручной кислотный шампунь для второй фазы мойки. &lt;br&gt; Отлично подходит для авто, покрытых керамикой или жидким стеклом. &lt;br&gt; Бережно удаляет статические загрязнения и нейтрализует щёлочь после первой фазы мойки",
+    "detail_images": [
+      "https://i.postimg.cc/JnV8q6mC/IMG-6756.jpg",
+      "https://i.postimg.cc/2y9XHyvL/IMG-6758.jpg",
+      "https://i.postimg.cc/WzyXGKLM/IMG-6757.jpg"
+    ]
+  },
+  "RADIATIX": {
+    "id": "RADIATIX",
+    "name": "средство для очистки внешней поверхности радиаторов RADIATIX",
+    "price": 750,
+    "category": "Автохимия",
+    "subcategory": "продукция SEVEN",
+    "image_url": "https://i.postimg.cc/hjvpwg0k/IMG-6715.jpg",
+    "description": "Высокоэффективное средство для очистки внешней поверхности радиаторов, системы охлаждения, кондиционера, интеркулера, системы смазки, КПП.",
+    "detail_images": [
+      "https://i.postimg.cc/hjvpwg0k/IMG-6715.jpg",
+      "https://i.postimg.cc/28RgqbG3/IMG-6718.jpg",
+      "https://i.postimg.cc/sXG0xsZp/IMG-6717.jpg"
+    ]
+  },
+  "KLINTUB": {
+    "id": "KLINTUB",
+    "name": "Средство для очитски патрубков и др. резиновых элементов KLINTUB",
+    "price": 750,
+    "category": "Автохимия",
+    "subcategory": "продукция SEVEN",
+    "image_url": "https://i.postimg.cc/rwnktyzb/IMG-6747.jpg",
+    "description": "Средство для очитски патрубков и др. резиновых элементов KLINTUB &lt;br&gt; 500мл",
+    "detail_images": [
+      "https://i.postimg.cc/rwnktyzb/IMG-6747.jpg",
+      "https://i.postimg.cc/rwm6c6g9/IMG-6749.jpg",
+      "https://i.postimg.cc/QCbPGSTP/IMG-6748.jpg"
+    ]
+  },
+  "KLINOL": {
+    "id": "KLINOL",
+    "name": "универсальный очиститель любых поверхностей KLINOL",
+    "price": 750,
+    "category": "Автохимия",
+    "subcategory": "продукция SEVEN",
+    "image_url": "https://i.postimg.cc/GhBhRSKG/IMG-6750.jpg",
+    "description": "Модификация:530мл &lt;br&gt; Особенности: нет &lt;br&gt; Характеристики: Универсальный очиститель бесспиртовой универсальный очиститель любых поверхностей. &lt;br&gt; Легко справляется с большинством бытовых загрязнений. &lt;br&gt; Не оставляет разводов. &lt;br&gt; Обладает эффектом антистатика.",
+    "detail_images": [
+      "https://i.postimg.cc/GhBhRSKG/IMG-6750.jpg",
+      "https://i.postimg.cc/2j1Vj681/IMG-6752.jpg",
+      "https://i.postimg.cc/yY9x9bRB/IMG-6751.jpg"
+    ]
+  },
+  "CHERRYON": {
+    "id": "CHERRYON",
+    "name": "очиститель металлических вкраплений и колодочной пыли CHERRYON",
+    "price": 750,
+    "category": "Автохимия",
+    "subcategory": "продукция SEVEN",
+    "image_url": "https://i.postimg.cc/L4GB2GRM/IMG-6738.jpg",
+    "description": "Модификация: 530мл &lt;br&gt; 5л Особенности: нет &lt;br&gt; Характеристика: очиститель металлических вкраплений и колодочной пыли с ароматом вишни",
+    "detail_images": [
+      "https://i.postimg.cc/L4GB2GRM/IMG-6738.jpg",
+      "https://i.postimg.cc/zXnW5B0n/IMG-6740.jpg",
+      "https://i.postimg.cc/tTZZcCsn/IMG-6739.jpg"
+    ]
+  },
+  "KOMAROFF": {
+    "id": "KOMAROFF",
+    "name": "Очиститель следов насекомых KOMAROFF",
+    "price": 750,
+    "category": "Автохимия",
+    "subcategory": "продукция SEVEN",
+    "image_url": "https://i.postimg.cc/JhWR8rYB/IMG-6722.jpg",
+    "description": "Модификация: 530мл &lt;br&gt; Особенности: нет &lt;br&gt; Характеристики: Высокоэффективный и безопасный для ЛКП очиститель следов насекомых. &lt;br&gt; Наша компания представляет Вашему вниманию нашу новую разработку - состав, для безопасной очистки мошкары с кузова Вашего автомобиля. &lt;br&gt; Уникальность продукта заключается в том, что он не содержит свободной щелочи как аналогичные составы.",
+    "detail_images": [
+      "https://i.postimg.cc/JhWR8rYB/IMG-6722.jpg",
+      "https://i.postimg.cc/yYgKSgwZ/IMG-6724.jpg",
+      "https://i.postimg.cc/GprnNM9F/IMG-6723.jpg"
+    ]
+  },
+  "ABRASIVE GLASS CLEANER": {
+    "id": "ABRASIVE GLASS CLEANER",
+    "name": "Паста полировальная для стекла ABRASIVE GLASS CLEANER",
+    "price": 750,
+    "category": "Автохимия",
+    "subcategory": "продукция SEVEN",
+    "image_url": "https://i.postimg.cc/R0jK4H5L/IMG-6706.jpg",
+    "description": "Модификация: нет &lt;br&gt; Особенности: нет &lt;br&gt; Характеристики: Абразивный очиститель SEVEN предназначен для полной очистки поверхности стекол от любых химических загрязнений и минеральных вкраплений. &lt;br&gt; После очистки стекла получается полностью готовая поверхность к нанесению гидрофобного покрытия. &lt;br&gt; Имеет небольшой эффект полировки. &lt;br&gt; Абразивный очиститель SEVEN можно использовать вручную, без применения полировальной машинки. &lt;br&gt; Состава 250мл хватает на очистку стёкол 50 автомобилей (лобовое стекло, заднее, два боковых, зеркала).",
+    "detail_images": [
+      "https://i.postimg.cc/R0jK4H5L/IMG-6706.jpg",
+      "https://i.postimg.cc/Y0xW6D4d/IMG-6708.jpg",
+      "https://i.postimg.cc/ZnJ95Pfp/IMG-6707.jpg"
+    ]
+  },
+  "QUARTSIK": {
+    "id": "QUARTSIK",
+    "name": "Кварцевое пократые QUARTSIK",
+    "price": 750,
+    "category": "Автохимия",
+    "subcategory": "продукция SEVEN",
+    "image_url": "https://i.postimg.cc/0yzCvxKx/IMG-6719.jpg",
+    "description": "Модификация: 250мл &lt;br&gt; Особенности: нет &lt;br&gt; Характеристики: Защитная покрытия от УФ лучей на основе диоксида кремния. &lt;br&gt; Придает гидрофобные свойства и блеск. &lt;br&gt; Эффект сохраняется до 3 месяцев.",
+    "detail_images": [
+      "https://i.postimg.cc/0yzCvxKx/IMG-6719.jpg",
+      "https://i.postimg.cc/G9wbpb3N/IMG-6721.jpg",
+      "https://i.postimg.cc/VvBz53Sk/IMG-6720.jpg"
+    ]
+  },
+  "TIRE CLEANER": {
+    "id": "TIRE CLEANER",
+    "name": "Очиститель покрыше и резины TIRE CLEANER",
+    "price": 750,
+    "category": "Автохимия",
+    "subcategory": "продукция SEVEN",
+    "image_url": "https://i.postimg.cc/GtJsrgdk/IMG-6741.jpg",
+    "description": "Модификация: 250мл &lt;br&gt; Особенности: Максимально безопасная формула, которая не сушит резину. &lt;br&gt; Характеристики: Высокоэффективный очиститель резины от въевшихся загрязнений. &lt;br&gt; Способ применения: 1. Распылить состав на сухую грязную резину. 2. Почистить при помощи щетки и смыть водой.",
+    "detail_images": [
+      "https://i.postimg.cc/GtJsrgdk/IMG-6741.jpg",
+      "https://i.postimg.cc/9XG9G0Zr/IMG-6743.jpg",
+      "https://i.postimg.cc/8PN6wGmw/IMG-6742.jpg"
+    ]
+  },
+  "KONVANT": {
+    "id": "KONVANT",
+    "name": "Консервант подкапотного пространства KONVANT",
+    "price": 750,
+    "category": "Автохимия",
+    "subcategory": "продукция SEVEN",
+    "image_url": "https://i.postimg.cc/KvG1BNmH/IMG-6732.jpg",
+    "description": "Консервант подкапотного пространства KONVANT &lt;br&gt; 250 мл",
+    "detail_images": [
+      "https://i.postimg.cc/KvG1BNmH/IMG-6732.jpg",
+      "https://i.postimg.cc/PrSP4wxr/IMG-6734.jpg",
+      "https://i.postimg.cc/7L2hwtNf/IMG-6733.jpg"
+    ]
+  },
+  "ACID TEXTILE SHAMPOO": {
+    "id": "ACID TEXTILE SHAMPOO",
+    "name": "Нейтрализатор щелочи ACID TEXTILE SHAMPOO",
+    "price": 750,
+    "category": "Автохимия",
+    "subcategory": "продукция SEVEN",
+    "image_url": "https://i.postimg.cc/sxNCBsjy/IMG-6753.jpg",
+    "description": "Модификация: 250мл &lt;br&gt; Характеристики: нейтрализует остатки щелочных составов после чистки синтетического текстиля. &lt;br&gt; Растворяет соли мочи. &lt;br&gt; Стабилизирует цвет ткани восстанавливает внешний вид. ",
+    "detail_images": [
+      "https://i.postimg.cc/sxNCBsjy/IMG-6753.jpg",
+      "https://i.postimg.cc/DfjTpdqD/IMG-6755.jpg",
+      "https://i.postimg.cc/TYKXzL0P/IMG-6754.jpg"
+    ]
+  },
+  "DIELECTRIC": {
+    "id": "DIELECTRIC",
+    "name": "диэлектрик DIELECTRIC",
+    "price": 750,
+    "category": "Автохимия",
+    "subcategory": "продукция SEVEN",
+    "image_url": "https://i.postimg.cc/K8FhRqF1/IMG-6712.jpg",
+    "description": "Модификация: нет Особенности: Хранить в тёмном, недоступном для детей месте, отдельно от пищевых продуктов. ",
+    "detail_images": [
+      "https://i.postimg.cc/K8FhRqF1/IMG-6712.jpg",
+      "https://i.postimg.cc/DZSttRQM/IMG-6714.jpg",
+      "https://i.postimg.cc/Rhf20fD1/IMG-6713.jpg"
+    ]
+  },
+  "LEATHER CLEANER": {
+    "id": "LEATHER CLEANER",
+    "name": "Очиститель кожи LEATHER CLEANER",
+    "price": 750,
+    "category": "Автохимия",
+    "subcategory": "продукция SEVEN",
+    "image_url": "https://i.postimg.cc/zfb75NMK/IMG-6744.jpg",
+    "description": "Модификация: 150мл &lt;br&gt; Особенности: &lt;br&gt; Очищает изделия из всех видов кожи это чистящее средство &lt;br&gt; разработанное специально для глубокой чистки натуральной кожи от распространенных видов загрязнителей. &lt;br&gt; Биоразлагаемость; &lt;br&gt; Антибактериальный эффект; &lt;br&gt; Точно подобранные современные компоненты, гарантирующие эффективную очистку и безопасность натуральной кожи и её отделочного покрытия!",
+    "detail_images": [
+      "https://i.postimg.cc/zfb75NMK/IMG-6744.jpg",
+      "https://i.postimg.cc/QCsJpTMJ/IMG-6746.jpg",
+      "https://i.postimg.cc/c1MmdXD9/IMG-6745.jpg"
+    ]
+  },
+  "AQUA STOP": {
+    "id": "AQUA STOP",
+    "name": "Анти дождь AQUA STOP",
+    "price": 750,
+    "category": "Автохимия",
+    "subcategory": "продукция SEVEN",
+    "image_url": "https://i.postimg.cc/QtPRhsjT/IMG-6725.jpg",
+    "description": "Модификация: 30мл &lt;br&gt; Особенности: &lt;br&gt;  хранить в темном, недоступном для детей месте &lt;br&gt; отдельно от пищевых продуктов. &lt;br&gt; Не мыть автомобиль с химией в течение 24 часов после нанесения. &lt;br&gt; Избегать намокания поверхности 3 часа. &lt;br&gt; Характеристики: гидрофобное покрытие для стекол. ",
+    "detail_images": [
+      "https://i.postimg.cc/QtPRhsjT/IMG-6725.jpg",
+      "https://i.postimg.cc/wxyCFtkc/IMG-6727.jpg",
+      "https://i.postimg.cc/pXKgbg4m/IMG-6726.jpg"
+    ]
+  },
+  "LEATHER LOTION MATT": {
+    "id": "LEATHER LOTION MATT",
+    "name": "Лосьон для кожи матовый LEATHER LOTION MATT",
+    "price": 750,
+    "category": "Автохимия",
+    "subcategory": "продукция SEVEN",
+    "image_url": "https://i.postimg.cc/VkpMqVsF/IMG-6728.jpg",
+    "description": "Модификация: нет &lt;br&gt; Особенности:&lt;br&gt; питает изделие из кожи и надежно защищает от негативных явлений окружающей среды &lt;br&gt; сохраняет их цвет и свойства кожи на протяжении всего срока эксплуатации. &lt;br&gt; Характеристики: &lt;br&gt; Защитный лосьон для кожи – инновационное средство для питания и защиты кожаных изделий, специально разработанный для ухода за деликатными видами кож, анилинового и полуанилинового типа из которых производят кожаные куртки, перчатки, обувь, сумки и др.",
+    "detail_images": [
+      "https://i.postimg.cc/VkpMqVsF/IMG-6728.jpg",
+      "https://i.postimg.cc/XJ0ChBCG/IMG-6730.jpg",
+      "https://i.postimg.cc/L4D1CX65/IMG-6729.jpg"
+    ]
+  },
+  "METAL POLISH COTTON": {
+    "id": "METAL POLISH COTTON",
+    "name": "вата для очистки и полеровки металлов 4г METAL POLISH COTTON",
+    "price": 750,
+    "category": "Автохимия",
+    "subcategory": "продукция SEVEN",
+    "image_url": "https://i.postimg.cc/rpY80B88/IMG-6705.jpg",
+    "description": "Модификация: нет &lt;br&gt; Особенности: Очищает и придает блеск изделиям из хрома,серба,нержавейки и др. &lt;br&gt; Характеристики: &lt;br&gt; Вата для очистки и полировки металлов. &lt;br&gt; Очищает и придаёт блеск изделиям из хрома, серебра, нержавейки и др. &lt;br&gt; Содержимого одной упаковки хватит для очистки хрома на 2-3 автомобилях при правильном использовании.",
+    "detail_images": [
+      "https://i.postimg.cc/rpY80B88/IMG-6705.jpg"
+    ]
+  },
+  "VATIX": {
+    "id": "VATIX",
+    "name": "VATIX 10г (METAL POLISH COTTON)",
+    "price": 750,
+    "category": "Автохимия",
+    "subcategory": "продукция SEVEN",
+    "image_url": "https://i.postimg.cc/76vWW993/IMG-6731.jpg",
+    "description": "Модификация: нет &lt;br&gt; Особенности: Очищает и придает блеск изделиям из хрома,серба,нержавейки и др. &lt;br&gt; Характеристики: &lt;br&gt; Вата для очистки и полировки металлов. &lt;br&gt; Очищает и придаёт блеск изделиям из хрома, серебра, нержавейки и др. &lt;br&gt; Содержимого одной упаковки хватит для очистки хрома на 2-3 автомобилях при правильном использовании.",
+    "detail_images": [
+      "https://i.postimg.cc/76vWW993/IMG-6731.jpg"
+    ]
+  },
+  "seven_cleaner_001": {
+    "id": "seven_cleaner_001",
+    "name": "Очиститель салона SEVEN",
+    "price": 750,
+    "category": "Автохимия",
+    "subcategory": "продукция SEVEN",
+    "image_url": "https://example.com/path/to/main_list_photo.jpg",
+    "description": "Высокоэффективный пенный очиститель для ткани и велюра. Глубоко проникает в структуру материала, удаляя застарелые пятна и неприятные запахи. Восстанавливает первоначальный цвет обивки и не оставляет разводов. Объем: 500 мл.",
+    "detail_images": [
+      "https://example.com/path/to/detail_photo_1.jpg",
+      "https://example.com/path/to/detail_photo_2.jpg",
+      "https://example.com/path/to/detail_photo_3.jpg"
+    ]
+  }
+}

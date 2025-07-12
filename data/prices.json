@@ -1,0 +1,124 @@
+{
+    "polishing": {
+        "small": {
+            "light_polishing": 3000,
+            "deep_polishing": 6000,
+            "presale_polishing": 2500
+        },
+        "medium": {
+            "light_polishing": 4000,
+            "deep_polishing": 8000,
+            "presale_polishing": 3500
+        },
+        "large": {
+            "light_polishing": 5000,
+            "deep_polishing": 10000,
+            "presale_polishing": 4500
+        }
+    },
+    "ceramics": {
+        "small": {
+            "presale_ceramics": 5000,
+            "medium_ceramics": 10000,
+            "long_ceramics": 15000
+        },
+        "medium": {
+            "presale_ceramics": 6000,
+            "medium_ceramics": 12000,
+            "long_ceramics": 18000
+        },
+        "large": {
+            "presale_ceramics": 7000,
+            "medium_ceramics": 14000,
+            "long_ceramics": 21000
+        }
+    },
+    "dry_cleaning": {
+        "small": {
+            "fabric": {
+                "light": 2000,
+                "medium": 3000,
+                "strong": 4000
+            },
+            "leather": {
+                "light": 2500,
+                "medium": 3500,
+                "strong": 4500
+            },
+            "alcantara": {
+                "light": 3000,
+                "medium": 4000,
+                "strong": 5000
+            },
+            "combined": {
+                "light": 2800,
+                "medium": 3800,
+                "strong": 4800
+            }
+        },
+        "medium": {
+            "fabric": {
+                "light": 3000,
+                "medium": 4000,
+                "strong": 5000
+            },
+            "leather": {
+                "light": 3500,
+                "medium": 4500,
+                "strong": 5500
+            },
+            "alcantara": {
+                "light": 4000,
+                "medium": 5000,
+                "strong": 6000
+            },
+            "combined": {
+                "light": 3800,
+                "medium": 4800,
+                "strong": 5800
+            }
+        },
+        "large": {
+            "fabric": {
+                "light": 4000,
+                "medium": 5000,
+                "strong": 6000
+            },
+            "leather": {
+                "light": 4500,
+                "medium": 5500,
+                "strong": 6500
+            },
+            "alcantara": {
+                "light": 5000,
+                "medium": 6000,
+                "strong": 7000
+            },
+            "combined": {
+                "light": 4800,
+                "medium": 5800,
+                "strong": 6800
+            }
+        }
+    },
+    "wrapping": 50000,
+    "washing": 1500,
+    "glass_polishing": 4000,
+    "long_ceramics": 0,
+    "deep_polishing": 0,
+    "combined": 0,
+    "full_wrapping": 0,
+    "light_polishing": 0,
+    "presale_polishing": 0,
+    "light": 0,
+    "medium": 0,
+    "local_wrapping": 0,
+    "strong": 0,
+    "presale_ceramics": 0,
+    "large": 0,
+    "leather": 0,
+    "fabric": 0,
+    "small": 0,
+    "alcantara": 0,
+    "medium_ceramics": 0
+}

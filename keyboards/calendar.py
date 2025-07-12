@@ -58,8 +58,12 @@ def create_calendar(year: int = None, month: int = None, unavailable_dates: list
             current_date = datetime(year, month, day).date() if day != 0 else None
             if day == 0:
                 row_buttons.append(InlineKeyboardButton(text=" ", callback_data="ignore"))
-            elif current_date and (current_date < now.date() or current_date in unavailable_dates):
-                row_buttons.append(InlineKeyboardButton(text=str(day), callback_data="ignore"))  # Прошедшие или занятые дни неактивны
+            elif current_date and current_date in unavailable_dates and current_date >= now.date():
+                # Будущие недоступные дни помечаем крестиком
+                row_buttons.append(InlineKeyboardButton(text=f"❌", callback_data="ignore"))
+            elif current_date and current_date < now.date():
+                # Прошедшие дни просто неактивны
+                row_buttons.append(InlineKeyboardButton(text=str(day), callback_data="ignore"))
             else:
                 row_buttons.append(InlineKeyboardButton(text=str(day), callback_data=CalendarCallback(action="select-day", year=year, month=month, day=day).pack()))
         builder.row(*row_buttons)
@@ -103,4 +107,41 @@ def create_stats_calendar(year: int = None, month: int = None) -> InlineKeyboard
                 row_buttons.append(InlineKeyboardButton(text=str(day), callback_data=StatsCalendarCallback(action="select-day", year=year, month=month, day=day).pack()))
         builder.row(*row_buttons)
 
+    return builder.as_markup()
+
+
+def create_admin_day_management_calendar(year: int = None, month: int = None) -> InlineKeyboardMarkup:
+    """
+    Создает инлайн-клавиатуру с календарем для управления выходными днями.
+    """
+    now = datetime.now()
+    if year is None:
+        year = now.year
+    if month is None:
+        month = now.month
+
+    builder = InlineKeyboardBuilder()
+
+    # Кнопки навигации: < Месяц Год >
+    builder.row(
+        InlineKeyboardButton(text="<", callback_data=StatsCalendarCallback(action="prev-month", year=year, month=month).pack()),
+        InlineKeyboardButton(text=f"{calendar.month_name[month]} {year}", callback_data="ignore"),
+        InlineKeyboardButton(text=">", callback_data=StatsCalendarCallback(action="next-month", year=year, month=month).pack())
+    )
+
+    # Дни недели
+    builder.row(*[InlineKeyboardButton(text=day, callback_data="ignore") for day in ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"]])
+
+    # Дни месяца
+    month_calendar = calendar.monthcalendar(year, month)
+    for week in month_calendar:
+        row_buttons = []
+        for day in week:
+            if day == 0:
+                row_buttons.append(InlineKeyboardButton(text=" ", callback_data="ignore"))
+            else:
+                row_buttons.append(InlineKeyboardButton(text=str(day), callback_data=StatsCalendarCallback(action="select-day", year=year, month=month, day=day).pack()))
+        builder.row(*row_buttons)
+
+    builder.row(InlineKeyboardButton(text="⬅️ Назад", callback_data="admin_booking_management"))
     return builder.as_markup()

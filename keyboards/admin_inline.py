@@ -2,6 +2,7 @@ from aiogram.filters.callback_data import CallbackData
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from database.db import get_product_by_id
+from utils.constants import SERVICE_NAMES
 
 
 class AdminOrdersPaginator(CallbackData, prefix="admin_order_page"):
@@ -20,10 +21,37 @@ class AdminSetOrderStatus(CallbackData, prefix="admin_set_status"):
     status: str # 'assembled' или 'shipped'
 
 
+class AdminClientPaginator(CallbackData, prefix="admin_client_page"):
+    action: str
+    page: int
+
+
 class AdminEditOrder(CallbackData, prefix="admin_edit_order"):
     action: str  # 'remove_item', 'finish'
     order_id: int
     item_id: str | None = None # ID товара для удаления
+
+
+class AdminEditClient(CallbackData, prefix="admin_edit_client"):
+    action: str # 'select', 'edit_name'
+    user_id: int
+
+
+class AdminPriceEdit(CallbackData, prefix="admin_price_edit"):
+    action: str # 'navigate' or 'edit'
+    # path is a colon-separated string like 'polishing:small:light_polishing'
+    path: str
+
+
+class AdminManageCandidate(CallbackData, prefix="adm_candidate"):
+    action: str  # view, delete, back_list, get_file
+    candidate_id: int
+    page: int
+
+
+class AdminCandidatesPaginator(CallbackData, prefix="adm_cand_pag"):
+    action: str  # prev, next, noop
+    page: int
 
 
 def get_admin_keyboard() -> InlineKeyboardMarkup:
@@ -33,8 +61,11 @@ def get_admin_keyboard() -> InlineKeyboardMarkup:
     builder.button(text="🛍️ Управление заказами", callback_data="admin_order_management")
     builder.button(text="🎁 Управление промокодами", callback_data="admin_promocode_management")
     builder.button(text="📊 Статистика", callback_data="admin_stats")
+    builder.button(text="👤 Управление клиентами", callback_data="admin_client_management")
+    builder.button(text="💰 Управление ценами", callback_data="admin_price_management")
     builder.button(text="📬 Рассылка", callback_data="admin_broadcast")
     builder.button(text="🚷 Управление блокировками", callback_data="admin_block_management")
+    builder.button(text="📬 Кандидаты", callback_data="admin_candidates_management")
     builder.adjust(1)
     return builder.as_markup()
 
@@ -49,7 +80,7 @@ def get_promocode_management_keyboard():
 def get_promocode_type_keyboard():
     builder = InlineKeyboardBuilder()
     builder.button(text="🛍️ Для магазина", callback_data="admin_add_promo_type_shop")
-    builder.button(text="🗓️ Для детейлинга (в разработке)", callback_data="admin_add_promo_type_detailing")
+    builder.button(text="✨ Для услуг детейлинга", callback_data="admin_add_promo_type_detailing")
     builder.button(text="🔙 Назад", callback_data="admin_promocode_management")
     builder.adjust(1)
     return builder.as_markup()
@@ -63,6 +94,7 @@ def get_booking_management_keyboard() -> InlineKeyboardMarkup:
         InlineKeyboardButton(text="Месяц", callback_data="admin_bookings_month")
     )
     builder.row(InlineKeyboardButton(text="❌ Отменить запись по ID", callback_data="admin_cancel_booking_start"))
+    builder.row(InlineKeyboardButton(text="🗓️ Управлять выходными днями", callback_data="admin_manage_closed_days"))
     builder.row(InlineKeyboardButton(text="⬅️ Назад", callback_data="admin_back_to_main"))
     return builder.as_markup()
 
@@ -179,4 +211,117 @@ async def get_order_editing_keyboard(order: dict) -> InlineKeyboardMarkup:
             )
 
     builder.row(InlineKeyboardButton(text="✅ Завершить редактирование", callback_data=AdminEditOrder(action="finish", order_id=order_id).pack()))
+    return builder.as_markup()
+
+
+def get_price_editing_keyboard(price_data: dict, current_path: str = "") -> InlineKeyboardMarkup:
+    """
+    Создает клавиатуру для навигации и редактирования цен.
+    price_data: текущий уровень вложенности словаря цен.
+    current_path: текущий путь в виде строки 'key1:key2'.
+    """
+    builder = InlineKeyboardBuilder()
+
+    for key, value in price_data.items():
+        # Формируем новый путь для callback_data
+        new_path = f"{current_path}|{key}" if current_path else key
+
+        # Получаем читаемое имя для кнопки
+        display_name = SERVICE_NAMES.get(key, key.replace('_', ' ').capitalize())
+
+        if isinstance(value, dict):
+            # Если значение - словарь, это навигационная кнопка
+            builder.button(
+                text=f"➡️ {display_name}",
+                callback_data=AdminPriceEdit(action="navigate", path=new_path).pack()
+            )
+        elif isinstance(value, (int, float)):
+            # Если значение - число, это кнопка для редактирования цены
+            builder.button(
+                text=f"✏️ {display_name}: {value} руб.",
+                callback_data=AdminPriceEdit(action="edit", path=new_path).pack()
+            )
+
+    # Кнопка "Назад"
+    if current_path:
+        parent_path = "|".join(current_path.split('|')[:-1])
+        builder.row(InlineKeyboardButton(
+            text="⬅️ Назад",
+            callback_data=AdminPriceEdit(action="navigate", path=parent_path).pack()
+        ))
+    else:
+        # Если мы в корне, возвращаемся в главное меню админки
+        builder.row(InlineKeyboardButton(text="⬅️ Назад в админ-панель", callback_data="admin_back_to_main"))
+
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def get_clients_list_keyboard(clients_on_page: list[dict], page: int, total_pages: int) -> InlineKeyboardMarkup:
+    """Создает клавиатуру со списком клиентов для управления."""
+    builder = InlineKeyboardBuilder()
+    for client in clients_on_page:
+        user_id = client['user_id']
+        name = client.get('user_full_name', f"ID: {user_id}")
+        username = client.get('user_username')
+        display_name = f"{name}" + (f" (@{username})" if username else "")
+
+        builder.row(
+            InlineKeyboardButton(text=display_name, callback_data="ignore"),
+            InlineKeyboardButton(
+                text="✏️ Изменить",
+                callback_data=AdminEditClient(action="select", user_id=user_id).pack()
+            )
+        )
+
+    # Paginator
+    pagination_row = []
+    if page > 0:
+        pagination_row.append(InlineKeyboardButton(text="< Назад", callback_data=AdminClientPaginator(action="prev", page=page).pack()))
+    if total_pages > 1:
+        pagination_row.append(InlineKeyboardButton(text=f"{page + 1} / {total_pages}", callback_data="ignore"))
+    if page < total_pages - 1:
+        pagination_row.append(InlineKeyboardButton(text="Вперед >", callback_data=AdminClientPaginator(action="next", page=page).pack()))
+
+    if pagination_row:
+        builder.row(*pagination_row)
+
+    builder.row(InlineKeyboardButton(text="⬅️ Назад в админ-панель", callback_data="admin_back_to_main"))
+    return builder.as_markup()
+
+
+def get_client_editing_keyboard(user_id: int, user_full_name: str, back_callback: str) -> InlineKeyboardMarkup:
+    """Клавиатура для редактирования данных клиента."""
+    builder = InlineKeyboardBuilder()
+    builder.button(text=f"✏️ Изменить имя ({user_full_name})", callback_data=AdminEditClient(action="edit_name", user_id=user_id).pack())
+    builder.button(text="⬅️ Назад к списку клиентов", callback_data=back_callback)
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def get_candidates_list_keyboard(candidates_on_page: list, page: int, total_pages: int) -> InlineKeyboardMarkup:
+    """
+    Создает клавиатуру со списком кандидатов и пагинацией.
+    """
+    builder = InlineKeyboardBuilder()
+    for candidate in candidates_on_page:
+        builder.button(
+            text=f"Отклик #{candidate['id']} от {candidate['user_full_name']}",
+            callback_data=AdminManageCandidate(action="view", candidate_id=candidate['id'], page=page).pack()
+        )
+    builder.adjust(1)
+
+    pagination_row = []
+    if page > 0:
+        pagination_row.append(
+            InlineKeyboardButton(text="⬅️", callback_data=AdminCandidatesPaginator(action="prev", page=page).pack())
+        )
+    if page < total_pages - 1:
+        pagination_row.append(
+            InlineKeyboardButton(text="➡️", callback_data=AdminCandidatesPaginator(action="next", page=page).pack())
+        )
+    if pagination_row:
+        builder.row(*pagination_row)
+
+    builder.row(InlineKeyboardButton(text="⬅️ Назад в меню", callback_data="admin_back_to_main"))
     return builder.as_markup()

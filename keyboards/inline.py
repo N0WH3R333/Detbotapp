@@ -1,6 +1,6 @@
 from aiogram.filters.callback_data import CallbackData
-from aiogram.types import InlineKeyboardMarkup
-from aiogram.utils.keyboard import InlineKeyboardBuilder, InlineKeyboardButton
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 
 class CancelBooking(CallbackData, prefix="cancel_booking"):
@@ -27,13 +27,22 @@ def get_services_keyboard(services: dict) -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
-def get_time_slots_keyboard(available_slots: list[str]) -> InlineKeyboardMarkup:
+def get_time_slots_keyboard(occupancy: dict[str, int], working_hours: list[str], max_bookings: int) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
-    if not available_slots:
+
+    has_available_slots = False
+    for slot in working_hours:
+        count = occupancy.get(slot, 0)
+        if count < max_bookings:
+            builder.button(text=slot, callback_data=f"time:{slot}")
+            has_available_slots = True
+        else:
+            builder.button(text=f"❌ {slot}", callback_data="ignore")
+
+    if not has_available_slots:
+        builder.buttons.clear()
         builder.button(text="На эту дату нет свободных слотов", callback_data="ignore")
-    else:
-        for slot in available_slots:
-            builder.button(text=slot, callback_data=f"time_{slot}")
+
     # выстраивает кнопки в два столбца для компактности
     builder.adjust(2)
     builder.row(InlineKeyboardButton(text="⬅️ Назад к выбору даты", callback_data="back_to_calendar"))

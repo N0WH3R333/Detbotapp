@@ -7,7 +7,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 from aiogram.types import CallbackQuery, User
 
-from config import ADMIN_ID, DELIVERY_COST
+from config import ADMIN_IDS, DELIVERY_COST
 from database.db import add_order_to_db, get_all_products, get_all_promocodes, increment_promocode_usage, get_product_by_id
 from keyboards.inline import get_shipping_keyboard
 from keyboards.admin_inline import get_new_order_admin_keyboard
@@ -142,30 +142,30 @@ async def _finalize_order(message: Message, user: User, state: FSMContext, bot: 
     await state.clear()
 
     # Уведомляем администратора
-    if ADMIN_ID:
-        try:
-            admin_text = f"🔔 <b>Новый заказ #{new_order['id']}!</b>\n\n<b>От:</b> {user.full_name} (ID: <code>{user.id}</code>)\n"
-            admin_text += f"<b>Username:</b> @{user.username or 'не указан'}\n\n<b>Состав заказа:</b>\n"
-            for item_id, quantity in cart.items():
-                # Используем новую функцию для поиска товара
-                product = await get_product_by_id(item_id) or {"name": "Неизвестный товар"}
-                admin_text += f"• {product['name']} x {quantity} шт.\n"
-            if discount_amount > 0:
-                admin_text += f"\n<b>Промокод:</b> {promocode} (-{discount_amount:.2f} руб.)"
-            if delivery_cost > 0:
-                admin_text += f"\n<b>Доставка:</b> {delivery_cost} руб."
-            admin_text += f"\n<b>Способ получения:</b> {shipping_method}"
-            if address:
-                admin_text += f"\n<b>Адрес доставки:</b> {address}"
-            admin_text += f"\n<b>Итого: {total_price:.2f} руб.</b>"
-            await bot.send_message(
-                ADMIN_ID,
-                admin_text,
-                reply_markup=get_new_order_admin_keyboard()
-            )
-            logger.info(f"Admin {ADMIN_ID} has been notified about the new order from user {user.id}.")
-        except Exception as e:
-            logger.error(f"Failed to send notification to admin {ADMIN_ID}: {e}")
+    if ADMIN_IDS:
+        admin_text = f"🔔 <b>Новый заказ #{new_order['id']}!</b>\n\n<b>От:</b> {user.full_name} (ID: <code>{user.id}</code>)\n"
+        admin_text += f"<b>Username:</b> @{user.username or 'не указан'}\n\n<b>Состав заказа:</b>\n"
+        for item_id, quantity in cart.items():
+            # Используем новую функцию для поиска товара
+            product = await get_product_by_id(item_id) or {"name": "Неизвестный товар"}
+            admin_text += f"• {product['name']} x {quantity} шт.\n"
+        if discount_amount > 0:
+            admin_text += f"\n<b>Промокод:</b> {promocode} (-{discount_amount:.2f} руб.)"
+        if delivery_cost > 0:
+            admin_text += f"\n<b>Доставка:</b> {delivery_cost} руб."
+        admin_text += f"\n<b>Способ получения:</b> {shipping_method}"
+        if address:
+            admin_text += f"\n<b>Адрес доставки:</b> {address}"
+        admin_text += f"\n<b>Итого: {total_price:.2f} руб.</b>"
+        
+        for admin_id in ADMIN_IDS:
+            try:
+                await bot.send_message(
+                    admin_id, admin_text, reply_markup=get_new_order_admin_keyboard()
+                )
+                logger.info(f"Admin {admin_id} has been notified about the new order from user {user.id}.")
+            except Exception as e:
+                logger.error(f"Failed to send notification to admin {admin_id}: {e}")
 
 
 @router.callback_query(OrderStates.choosing_shipping, F.data.startswith("shipping_"))

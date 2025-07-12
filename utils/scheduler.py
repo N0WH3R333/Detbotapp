@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.jobstores.base import JobLookupError
 
-from config import REMINDER_HOURS_BEFORE, ADMIN_ID, DAILY_REPORT_TIME, WEEKLY_REPORT_DAY_OF_WEEK, WEEKLY_REPORT_TIME
+from config import REMINDER_HOURS_BEFORE, ADMIN_IDS, DAILY_REPORT_TIME, WEEKLY_REPORT_DAY_OF_WEEK, WEEKLY_REPORT_TIME
 from database.db import get_all_bookings
 from utils.bot_instance import bot_instance
 from utils.reports import generate_period_report_text
@@ -16,12 +16,16 @@ scheduler = AsyncIOScheduler(timezone="Europe/Moscow")
 
 async def send_report(period_days: int):
     """Отправляет отчет администратору."""
-    if ADMIN_ID and bot_instance.bot:
+    if ADMIN_IDS and bot_instance.bot:
         now = datetime.now()
         start_date = now - timedelta(days=period_days)
         report_text = await generate_period_report_text(start_date, now)
-        await bot_instance.bot.send_message(ADMIN_ID, report_text)
-        logger.info(f"Sent {period_days}-day report to admin {ADMIN_ID}")
+        for admin_id in ADMIN_IDS:
+            try:
+                await bot_instance.bot.send_message(admin_id, report_text)
+                logger.info(f"Sent {period_days}-day report to admin {admin_id}")
+            except Exception as e:
+                logger.error(f"Failed to send report to admin {admin_id}: {e}")
 
 
 async def send_booking_reminder(user_id: int, booking_id: int, service: str, date_str: str, time_str: str):
