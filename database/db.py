@@ -5,6 +5,7 @@ import os
 from datetime import datetime
 import tempfile
 from typing import Any
+from .pool import get_pool
 
 logger = logging.getLogger(__name__)
 
@@ -13,7 +14,6 @@ BOOKINGS_FILE = os.path.join(DATA_DIR, "bookings.json")
 ORDERS_FILE = os.path.join(DATA_DIR, "orders.json")
 BLOCKED_USERS_FILE = os.path.join(DATA_DIR, "blocked_users.json")
 PRODUCTS_FILE = os.path.join(DATA_DIR, "products.json")
-PROMOCODES_FILE = os.path.join(DATA_DIR, "promocodes.json")
 PRICES_FILE = os.path.join(DATA_DIR, "prices.json")
 BLOCKED_DATES_FILE = os.path.join(DATA_DIR, "blocked_dates.json")
 CANDIDATES_FILE = os.path.join(DATA_DIR, "candidates.json")
@@ -24,7 +24,6 @@ file_locks = {
     ORDERS_FILE: asyncio.Lock(),
     BLOCKED_USERS_FILE: asyncio.Lock(),
     PRODUCTS_FILE: asyncio.Lock(),
-    PROMOCODES_FILE: asyncio.Lock(),
     PRICES_FILE: asyncio.Lock(),
     BLOCKED_DATES_FILE: asyncio.Lock(),
     CANDIDATES_FILE: asyncio.Lock(),
@@ -36,7 +35,6 @@ _DEFAULT_EMPTY_VALUES = {
     ORDERS_FILE: [],
     BLOCKED_USERS_FILE: [],
     PRODUCTS_FILE: {},
-    PROMOCODES_FILE: {},
     PRICES_FILE: {},
     BLOCKED_DATES_FILE: [],
     CANDIDATES_FILE: [],
@@ -168,15 +166,6 @@ async def ensure_data_files_exist():
           }
         }
         await _write_data(PRODUCTS_FILE, initial_products)
-    if not os.path.exists(PROMOCODES_FILE):
-        # Добавляем поля usage_limit и times_used.
-        # usage_limit: null означает "без лимита".
-        initial_promocodes = {
-            "SALE10": {"type": "shop", "discount": 10, "start_date": "2024-01-01", "end_date": "2099-12-31", "usage_limit": None, "times_used": 0},
-            "LIMITED25": {"type": "shop", "discount": 25, "start_date": "2024-01-01", "end_date": "2099-12-31", "usage_limit": 100, "times_used": 10},
-            "DETAILING5": {"type": "detailing", "discount": 5, "start_date": "2024-01-01", "end_date": "2099-12-31", "usage_limit": None, "times_used": 0}
-        }
-        await _write_data(PROMOCODES_FILE, initial_promocodes)
 
 
 
@@ -236,10 +225,6 @@ async def update_prices(new_prices_data: dict) -> None:
     """Полностью перезаписывает файл с ценами."""
     await _write_data(PRICES_FILE, new_prices_data)
 
-async def get_all_promocodes() -> dict:
-    """Читает все промокоды из файла."""
-    return await _read_data(PROMOCODES_FILE)
-
 
 async def get_blocked_dates() -> list[str]:
     """Возвращает список заблокированных дат в формате 'dd.mm.yyyy'."""
@@ -263,30 +248,56 @@ async def remove_blocked_date(date_str: str) -> None:
         await _write_data(BLOCKED_DATES_FILE, sorted(blocked_dates))
         logger.info(f"Date {date_str} has been unblocked by admin.")
 
-async def add_promocode_to_db(code: str, discount: int, start_date: str, end_date: str, usage_limit: int | None, promo_type: str) -> None:
-    """Добавляет или обновляет промокод в файле."""
-    promocodes = await get_all_promocodes()
-    promocodes[code.upper()] = {
-        "type": promo_type,
-        "discount": discount,
-        "start_date": start_date,
-        "end_date": end_date,
-        "usage_limit": usage_limit,
-        "times_used": 0  # При создании/обновлении счетчик сбрасывается
-    }
-    await _write_data(PROMOCODES_FILE, promocodes)
+# --- Новые функции для работы с промокодами через PostgreSQL ---
 
+async def get_all_promocodes() -> dict:
+    """Читает все промокоды из базы данных и возвращает их в виде словаря."""
+    pool = await get_pool()
+    async with pool.acquire() as connection:
+        records = await connection.fetch("SELECT * FROM promocodes ORDER BY created_at DESC")
+        # Преобразуем список записей в словарь, как было раньше, для совместимости
+        promocodes_dict = {
+            rec['code']: {
+                "type": rec['promo_type'],
+                "discount": rec['discount_percent'],
+                "start_date": rec['start_date'].strftime("%Y-%m-%d"),
+                "end_date": rec['end_date'].strftime("%Y-%m-%d"),
+                "usage_limit": rec['usage_limit'],
+                "times_used": rec['times_used']
+            } for rec in records
+        }
+        return promocodes_dict
+
+async def add_promocode_to_db(code: str, discount: int, start_date: str, end_date: str, usage_limit: int | None, promo_type: str) -> None:
+    """Добавляет или обновляет промокод в базе данных."""
+    pool = await get_pool()
+    sql = """
+        INSERT INTO promocodes (code, promo_type, discount_percent, start_date, end_date, usage_limit, times_used)
+        VALUES ($1, $2, $3, $4, $5, $6, 0)
+        ON CONFLICT (code) DO UPDATE SET
+            promo_type = EXCLUDED.promo_type,
+            discount_percent = EXCLUDED.discount_percent,
+            start_date = EXCLUDED.start_date,
+            end_date = EXCLUDED.end_date,
+            usage_limit = EXCLUDED.usage_limit,
+            times_used = 0; -- Сбрасываем счетчик при обновлении
+    """
+    async with pool.acquire() as connection:
+        await connection.execute(sql, code.upper(), promo_type, discount, start_date, end_date, usage_limit)
+    logger.info(f"Promocode {code.upper()} was added or updated in the database.")
 
 async def increment_promocode_usage(code: str) -> None:
-    """Увеличивает счетчик использования промокода на 1."""
+    """Увеличивает счетчик использования промокода на 1 в базе данных."""
     if not code:
         return
-    promocodes = await get_all_promocodes()
-    promo_data = promocodes.get(code.upper())
-    if promo_data:
-        promo_data['times_used'] = promo_data.get('times_used', 0) + 1
-        await _write_data(PROMOCODES_FILE, promocodes)
-        logger.info(f"Incremented usage count for promocode {code.upper()}.")
+    pool = await get_pool()
+    sql = "UPDATE promocodes SET times_used = times_used + 1 WHERE code = $1;"
+    async with pool.acquire() as connection:
+        result = await connection.execute(sql, code.upper())
+        if result == "UPDATE 1":
+             logger.info(f"Incremented usage count for promocode {code.upper()}.")
+        else:
+             logger.warning(f"Attempted to increment usage for non-existent promocode {code.upper()}.")
 
 
 async def get_product_by_id(product_id: str) -> dict | None:
