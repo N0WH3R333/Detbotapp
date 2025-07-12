@@ -14,7 +14,7 @@ import aiohttp_cors
 from config import (
     BOT_TOKEN, ADMIN_IDS, LOG_LEVEL, LOG_LEVEL_HANDLERS, LOG_LEVEL_DATABASE,
     LOG_LEVEL_AIOGRAM, LOG_DIR, LOG_FILE, LOG_MAX_BYTES, LOG_BACKUP_COUNT,
-    WEBAPP_URL
+    WEBAPP_URL, DATABASE_URL
 )
 from handlers import common, booking, webapp_shop, group_management, hiring, errors
 from handlers.admin import admin_router
@@ -22,6 +22,7 @@ from database.db import (
     get_all_promocodes, get_all_products, ensure_data_files_exist,
     get_all_prices, update_prices
 )
+from database.pool import get_pool, close_pool
 from utils.bot_instance import bot_instance
 from utils.constants import (CAR_SIZES, POLISHING_TYPES, CERAMICS_TYPES,
                              WRAPPING_TYPES, INTERIOR_TYPES, DIRT_LEVELS)
@@ -233,6 +234,15 @@ async def validate_promocode_handler(request: web.Request) -> web.Response:
 
 async def main() -> None:
     setup_logging()
+
+    # Проверяем наличие DATABASE_URL перед тем, как делать что-либо еще
+    if not DATABASE_URL:
+        logging.critical("Переменная DATABASE_URL не установлена. Бот не может запуститься без подключения к базе данных.")
+        return
+
+    # Создаем пул соединений при старте
+    await get_pool()
+
     await ensure_data_files_exist()
 
     # Добавляем предварительную проверку синтаксиса products.json для более точной диагностики
@@ -329,6 +339,7 @@ async def main() -> None:
         await dp.start_polling(bot)
     finally:
         logging.info("Остановка бота и веб-сервера...")
+        await close_pool() # Закрываем пул соединений
         scheduler.shutdown()
         await runner.cleanup()
         await bot.session.close()

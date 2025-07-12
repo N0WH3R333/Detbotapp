@@ -50,3 +50,6 @@ DAILY_REPORT_TIME = _get_env_var("DAILY_REPORT_TIME", "21:00")
 WEEKLY_REPORT_DAY_OF_WEEK = _get_env_var("WEEKLY_REPORT_DAY_OF_WEEK", "sun")
 WEEKLY_REPORT_TIME = _get_env_var("WEEKLY_REPORT_TIME", "22:00")
 MAX_PARALLEL_BOOKINGS = _get_env_var("MAX_PARALLEL_BOOKINGS", 12, int)
+
+# --- Database Configuration ---
+DATABASE_URL = os.getenv("DATABASE_URL")
