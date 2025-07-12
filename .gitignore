@@ -13,3 +13,6 @@ __pycache__/
 # Log files
 logs/
 *.log
+
+# Executables and binaries
+*.exe
