@@ -9,7 +9,7 @@ from aiogram.exceptions import TelegramBadRequest
 from keyboards.reply import get_main_menu_keyboard
 from keyboards.inline import get_my_bookings_keyboard, CancelBooking, OrderPaginator, get_orders_keyboard, CancelOrder
 from database.db import get_user_bookings, cancel_booking_in_db, get_user_orders, cancel_order_in_db, get_product_by_id
-from config import WEBAPP_URL, ADMIN_IDS, BACKEND_PUBLIC_URL
+from config import WEBAPP_URL, ADMIN_IDS
 from utils.scheduler import cancel_reminder
 
 ORDERS_PER_PAGE = 5  # Количество заказов на одной странице
