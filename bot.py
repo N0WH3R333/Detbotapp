@@ -202,39 +202,38 @@ async def validate_promocode_handler(request: web.Request) -> web.Response:
     origin = request.headers.get('Origin')
     logger.debug(f"API request to validate promocode '{promocode}' from origin: {origin}, method: {request.method}")
 
+    # Guard Clause: Промокод не предоставлен или не существует
+    if not promocode or promocode not in (promocodes_db := await get_all_promocodes()):
+        logger.debug(f"Promocode '{promocode}' is invalid or not found.")
+        return _create_api_response({"valid": False})
+
+    promo_data = promocodes_db[promocode]
     promocodes_db = await get_all_promocodes()
     today = datetime.now().date()
 
-    if promocode and promocode in promocodes_db:
-        promo_data = promocodes_db[promocode]
-        try:
-            start_date = datetime.strptime(promo_data.get("start_date"), "%Y-%m-%d").date()
-            end_date = datetime.strptime(promo_data.get("end_date"), "%Y-%m-%d").date()
+    try:
+        start_date = datetime.strptime(promo_data.get("start_date"), "%Y-%m-%d").date()
+        end_date = datetime.strptime(promo_data.get("end_date"), "%Y-%m-%d").date()
 
-            if start_date <= today <= end_date:
-                # Проверка лимита использований
-                usage_limit = promo_data.get("usage_limit")
-                if usage_limit is not None:
-                    times_used = promo_data.get("times_used", 0)
-                    if times_used >= usage_limit:
-                        response_data = {"valid": False, "reason": "limit_reached"}
-                        logger.debug(f"Promocode {promocode} has reached its usage limit.")
-                        return _create_api_response(response_data)
+        # Guard Clause: Срок действия промокода истек
+        if not (start_date <= today <= end_date):
+            logger.debug(f"Promocode {promocode} is expired.")
+            return _create_api_response({"valid": False, "reason": "expired"})
 
-                discount = promo_data.get("discount")
-                response_data = {"valid": True, "discount": discount}
-                logger.debug(f"Promocode {promocode} is valid, discount: {discount}%")
-            else:
-                response_data = {"valid": False, "reason": "expired"}
-                logger.debug(f"Promocode {promocode} is expired.")
-        except (ValueError, KeyError, TypeError):
-            response_data = {"valid": False, "reason": "invalid_format"}
-            logger.warning(f"Promocode {promocode} has invalid data format: {promo_data}")
-    else:
-        response_data = {"valid": False}
-        logger.debug(f"Promocode {promocode} is invalid.")
+        # Guard Clause: Проверка лимита использований
+        if (usage_limit := promo_data.get("usage_limit")) is not None:
+            if promo_data.get("times_used", 0) >= usage_limit:
+                logger.debug(f"Promocode {promocode} has reached its usage limit.")
+                return _create_api_response({"valid": False, "reason": "limit_reached"})
 
-    return _create_api_response(response_data)
+        # Успешный случай
+        discount = promo_data.get("discount")
+        logger.debug(f"Promocode {promocode} is valid, discount: {discount}%")
+        return _create_api_response({"valid": True, "discount": discount})
+
+    except (ValueError, KeyError, TypeError):
+        logger.warning(f"Promocode {promocode} has invalid data format: {promo_data}")
+        return _create_api_response({"valid": False, "reason": "invalid_format"})
 
 async def main() -> None:
     setup_logging()
