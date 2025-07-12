@@ -2,7 +2,7 @@ from aiogram import Router, F, Bot
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 import logging
-from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, InputMediaPhoto, InputMediaVideo
+from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, InputMediaPhoto, InputMediaVideo, User
 from datetime import datetime, date, timedelta
 from collections import Counter, defaultdict
 
@@ -16,7 +16,7 @@ from keyboards.booking_keyboards import (
 )
 from database.db import add_booking_to_db, get_all_prices, get_all_bookings, get_blocked_dates, get_all_promocodes, increment_promocode_usage
 from utils.scheduler import schedule_reminder
-from utils.constants import SERVICE_NAMES, WORKING_HOURS
+from utils.constants import ALL_NAMES, WORKING_HOURS
 from config import ADMIN_IDS, MAX_PARALLEL_BOOKINGS
 
 MAX_MEDIA_FILES = 10
@@ -79,8 +79,21 @@ async def calculate_booking_price(data: dict) -> tuple[int, int, float]:
 async def get_booking_summary(data: dict) -> str:
     """Формирует текстовое описание и стоимость выбранных услуг."""
     summary_parts = []
-    # ... (code for adding service, car_size, etc. to summary_parts remains the same) ...
-    # ...
+    if service := data.get('service'):
+        summary_parts.append(f"<b>Основная услуга:</b> {ALL_NAMES.get(service, service)}")
+    if car_size := data.get('car_size'):
+        summary_parts.append(f"<b>Размер автомобиля:</b> {ALL_NAMES.get(car_size, car_size)}")
+    if service_type := data.get('service_type'):
+        summary_parts.append(f"<b>Тип:</b> {ALL_NAMES.get(service_type, service_type)}")
+    if interior_type := data.get('interior_type'):
+        summary_parts.append(f"<b>Тип салона:</b> {ALL_NAMES.get(interior_type, interior_type)}")
+    if dirt_level := data.get('dirt_level'):
+        summary_parts.append(f"<b>Степень загрязнения:</b> {ALL_NAMES.get(dirt_level, dirt_level)}")
+    if comment := data.get('comment'):
+        summary_parts.append(f"<b>Комментарий:</b> <b>{comment}</b>")
+    if media_files := data.get('media_files'):
+        if len(media_files) > 0:
+            summary_parts.append(f"<b>✓ Медиафайлы: {len(media_files)} шт.</b>")
 
     base_price, discount_amount, final_price = await calculate_booking_price(data)
 
@@ -418,7 +431,7 @@ async def _save_booking_to_db(user: User, state_data: dict, final_price: float, 
         "discount_amount": discount_amount,
         "comment": state_data.get("comment"),
         "media_files": state_data.get("media_files", []),
-        "service": SERVICE_NAMES.get(state_data.get("service"), "Неизвестная услуга"),
+        "service": ALL_NAMES.get(state_data.get("service"), "Неизвестная услуга"),
         "details": state_data
     }
     new_booking = await add_booking_to_db(

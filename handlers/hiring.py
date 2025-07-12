@@ -56,6 +56,22 @@ async def start_application(callback: CallbackQuery, state: FSMContext):
     )
     await callback.answer()
 
+async def _notify_admins_of_new_candidate(bot: Bot, candidate: dict, user_info: dict):
+    """Отправляет уведомление о новом кандидате всем администраторам."""
+    if not ADMIN_IDS:
+        return
+
+    admin_text = (
+        f"📬 <b>Новый отклик на вакансию! (ID: {candidate['id']})</b>\n\n"
+        f"<b>Кандидат:</b> {user_info['full_name']} (<code>{user_info['id']}</code>, @{user_info['username'] or 'не указан'})\n\n"
+        f"<b>Сообщение:</b>\n<pre>{candidate.get('message_text') or 'Нет текста.'}</pre>"
+    )
+    for admin_id in ADMIN_IDS:
+        try:
+            await (bot.send_document(admin_id, document=candidate['file_id'], caption=admin_text) if candidate.get('file_id') else bot.send_message(admin_id, admin_text))
+        except Exception as e:
+            logger.error(f"Failed to send new candidate notification to admin {admin_id}: {e}")
+
 @router.message(HiringStates.writing_application, F.text | F.document)
 async def process_application(message: Message, state: FSMContext, bot: Bot):
     user = message.from_user
@@ -72,17 +88,12 @@ async def process_application(message: Message, state: FSMContext, bot: Bot):
         message_text=text, file_id=file_id, file_name=file_name
     )
 
-    if ADMIN_IDS:
-        admin_text = (
-            f"📬 <b>Новый отклик на вакансию! (ID: {new_candidate['id']})</b>\n\n"
-            f"<b>Кандидат:</b> {user.full_name} (<code>{user.id}</code>, @{user.username or 'не указан'})\n\n"
-            f"<b>Сообщение:</b>\n<pre>{text or 'Нет текста.'}</pre>"
-        )
-        for admin_id in ADMIN_IDS:
-            try:
-                await (bot.send_document(admin_id, document=file_id, caption=admin_text) if file_id else bot.send_message(admin_id, admin_text))
-            except Exception as e:
-                logger.error(f"Failed to send new candidate notification to admin {admin_id}: {e}")
+    # Уведомляем администраторов с помощью новой функции
+    await _notify_admins_of_new_candidate(bot, new_candidate, {
+        "id": user.id,
+        "full_name": user.full_name,
+        "username": user.username
+    })
 
     await message.answer(
         "✅ Спасибо! Ваш отклик получен. Мы свяжемся с вами, если ваша кандидатура нас заинтересует.",

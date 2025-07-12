@@ -2,7 +2,7 @@ from aiogram.filters.callback_data import CallbackData
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from database.db import get_product_by_id
-from utils.constants import SERVICE_NAMES
+from utils.constants import ALL_NAMES
 
 
 class AdminOrdersPaginator(CallbackData, prefix="admin_order_page"):
@@ -227,7 +227,7 @@ def get_price_editing_keyboard(price_data: dict, current_path: str = "") -> Inli
         new_path = f"{current_path}|{key}" if current_path else key
 
         # Получаем читаемое имя для кнопки
-        display_name = SERVICE_NAMES.get(key, key.replace('_', ' ').capitalize())
+        display_name = ALL_NAMES.get(key, key.replace('_', ' ').capitalize())
 
         if isinstance(value, dict):
             # Если значение - словарь, это навигационная кнопка

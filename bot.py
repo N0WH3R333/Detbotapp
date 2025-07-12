@@ -23,10 +23,8 @@ from database.db import (
     get_all_prices, update_prices
 )
 from utils.bot_instance import bot_instance
-from utils.constants import (
-    SERVICE_NAMES, CAR_SIZES, POLISHING_TYPES, CERAMICS_TYPES,
-    WRAPPING_TYPES, INTERIOR_TYPES, DIRT_LEVELS
-)
+from utils.constants import (CAR_SIZES, POLISHING_TYPES, CERAMICS_TYPES,
+                             WRAPPING_TYPES, INTERIOR_TYPES, DIRT_LEVELS)
 from middlewares.block_middleware import BlockMiddleware
 from utils.scheduler import scheduler, schedule_existing_reminders, schedule_reports
 
@@ -75,8 +73,6 @@ async def _ensure_price_keys_exist():
     logger.info("Checking for missing price keys...")
     prices = await get_all_prices()
 
-    all_service_keys = set(SERVICE_NAMES.keys())
-    
     default_structures = {
         "washing": 0,
         "glass_polishing": 0,
@@ -87,7 +83,8 @@ async def _ensure_price_keys_exist():
     }
 
     updated = False
-    for key in all_service_keys:
+    # Итерируемся по ключам словаря default_structures как по источнику правды
+    for key in default_structures.keys():
         if key not in prices:
             logger.warning(f"Price key '{key}' is missing. Creating default structure.")
             prices[key] = default_structures.get(key, 0)
