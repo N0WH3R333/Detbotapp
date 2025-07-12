@@ -35,6 +35,9 @@ ADMIN_IDS = []
 if ADMIN_ID_STR:
     ADMIN_IDS = [int(admin_id.strip()) for admin_id in ADMIN_ID_STR.split(',') if admin_id.strip().isdigit()]
 
+# ID главного администратора с особыми правами
+SUPER_ADMIN_ID = _get_env_var("SUPER_ADMIN_ID", None, int)
+
 LOG_LEVEL = _get_env_var("LOG_LEVEL", "INFO").upper()
 LOG_LEVEL_HANDLERS = _get_env_var("LOG_LEVEL_HANDLERS", "INFO").upper()
 LOG_LEVEL_AIOGRAM = _get_env_var("LOG_LEVEL_AIOGRAM", "INFO").upper()

@@ -3,6 +3,7 @@ from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from database.db import get_product_by_id
 from utils.constants import ALL_NAMES
+from config import SUPER_ADMIN_ID
 
 
 class AdminOrdersPaginator(CallbackData, prefix="admin_order_page"):
@@ -54,8 +55,11 @@ class AdminCandidatesPaginator(CallbackData, prefix="adm_cand_pag"):
     page: int
 
 
-def get_admin_keyboard() -> InlineKeyboardMarkup:
-    """Основная клавиатура админ-панели."""
+def get_admin_keyboard(user_id: int) -> InlineKeyboardMarkup:
+    """
+    Основная клавиатура админ-панели.
+    Показывает дополнительные кнопки для супер-админа.
+    """
     builder = InlineKeyboardBuilder()
     builder.button(text="🗓️ Управление записями", callback_data="admin_booking_management")
     builder.button(text="🛍️ Управление заказами", callback_data="admin_order_management")
@@ -66,6 +70,20 @@ def get_admin_keyboard() -> InlineKeyboardMarkup:
     builder.button(text="📬 Рассылка", callback_data="admin_broadcast")
     builder.button(text="🚷 Управление блокировками", callback_data="admin_block_management")
     builder.button(text="📬 Кандидаты", callback_data="admin_candidates_management")
+
+    # Кнопка, видимая только супер-админу
+    if user_id == SUPER_ADMIN_ID:
+        builder.button(text="👑 Управление администрацией", callback_data="admin_manage_admins")
+
+    builder.adjust(1)
+    return builder.as_markup()
+
+def get_admin_management_keyboard() -> InlineKeyboardMarkup:
+    """Клавиатура для управления другими администраторами."""
+    builder = InlineKeyboardBuilder()
+    builder.button(text="➕ Добавить администратора", callback_data="admin_add_admin_start")
+    builder.button(text="➖ Удалить администратора", callback_data="admin_remove_admin_start")
+    builder.button(text="⬅️ Назад в админ-панель", callback_data="admin_back_to_main")
     builder.adjust(1)
     return builder.as_markup()
 

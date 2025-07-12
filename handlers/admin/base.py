@@ -11,7 +11,7 @@ router = Router()
 async def cmd_admin(message: Message, state: FSMContext):
     """Открывает админ-панель."""
     await state.clear()
-    await message.answer("Добро пожаловать в админ-панель!", reply_markup=get_admin_keyboard())
+    await message.answer("Добро пожаловать в админ-панель!", reply_markup=get_admin_keyboard(user_id=message.from_user.id))
 
 
 @router.callback_query(F.data == "admin_back_to_main")
@@ -20,6 +20,6 @@ async def back_to_admin_menu(callback: CallbackQuery, state: FSMContext):
     await state.clear()
     await callback.message.edit_text(
         "Добро пожаловать в админ-панель!",
-        reply_markup=get_admin_keyboard()
+        reply_markup=get_admin_keyboard(user_id=callback.from_user.id)
     )
     await callback.answer()
