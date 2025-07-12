@@ -1,18 +1,37 @@
 # Environments
 .env
 .env.local
+.env.*
 .venv
 venv/
 env/
+ENV/
 
 # IDE and OS files
 .vscode/
 .idea/
+*.swp
+
+# Python cache
 __pycache__/
+*.pyc
+*.pyo
+*.pyd
 
 # Log files
 logs/
 *.log
 
+# Test and coverage reports
+.coverage
+.cache
+.pytest_cache/
+htmlcov/
+
 # Executables and binaries
 *.exe
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
