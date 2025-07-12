@@ -6,31 +6,51 @@ SERVICE_NAMES = {
     "wrapping": "🎨 Оклейка кузова",
     "washing": "💧 Трехфазная мойка",
     "glass_polishing": "🔍 Полировка стекол",
-    # Car sizes
+}
+
+CAR_SIZE_NAMES = {
     "small": "🚗 Малый кузов",
     "medium": "🚙 Средний кузов",
     "large": "🚚 Большой кузов",
-    # Polishing types
+}
+
+POLISHING_TYPE_NAMES = {
     "light_polishing": "✨ Легкая полировка",
     "deep_polishing": "💎 Глубокая полировка",
     "presale_polishing": "💰 Предпродажная полировка",
-    # Ceramics types
+}
+
+CERAMICS_TYPE_NAMES = {
     "presale_ceramics": "💰 Предпродажная",
     "medium_ceramics": "🛡️ Средняя",
     "long_ceramics": "💎 Длительная",
-    # Wrapping types
+}
+
+WRAPPING_TYPE_NAMES = {
     "full_wrapping": "Полная оклейка",
     "local_wrapping": "Локальная оклейка",
-    # Interior types
+}
+
+INTERIOR_TYPE_NAMES = {
     "fabric": "🧵 Ткань",
     "leather": "🛋️ Кожа",
     "alcantara": "⚜️ Алькантара",
     "combined": "🔄 Комбинированный",
-    # Dirt levels
+}
+
+DIRT_LEVEL_NAMES = {
     "light": "🧼 Легкая",
     "medium": "🧽 Средняя",
     "strong": "💥 Сильная",
 }
+
+# Списки ключей, которые используются в bot.py
+CAR_SIZES = list(CAR_SIZE_NAMES.keys())
+POLISHING_TYPES = list(POLISHING_TYPE_NAMES.keys())
+CERAMICS_TYPES = list(CERAMICS_TYPE_NAMES.keys())
+WRAPPING_TYPES = list(WRAPPING_TYPE_NAMES.keys())
+INTERIOR_TYPES = list(INTERIOR_TYPE_NAMES.keys())
+DIRT_LEVELS = list(DIRT_LEVEL_NAMES.keys())
 
 # Единый список рабочих часов для записи
 WORKING_HOURS = [

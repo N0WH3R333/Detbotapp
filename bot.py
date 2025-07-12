@@ -208,7 +208,6 @@ async def validate_promocode_handler(request: web.Request) -> web.Response:
         return _create_api_response({"valid": False})
 
     promo_data = promocodes_db[promocode]
-    promocodes_db = await get_all_promocodes()
     today = datetime.now().date()
 
     try:
