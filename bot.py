@@ -8,6 +8,7 @@ from aiogram import Bot, Dispatcher, F
 from aiogram.client.default import DefaultBotProperties
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiohttp import web
+import aiohttp_cors
 import json
 
 from config import (
@@ -107,19 +108,12 @@ async def _ensure_price_keys_exist():
 
 def _create_api_response(
     data: dict | list | None,
-    status: int = 200,
-    origin: str | None = None
+    status: int = 200
 ) -> web.Response:
-    """Создает aiohttp.web.Response с CORS заголовками."""
-    headers = {
-        "Access-Control-Allow-Origin": WEBAPP_URL or origin or "*",
-        "Access-Control-Allow-Methods": "GET, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type",
-    }
+    """Создает aiohttp.web.Response."""
     if status == 204: # No Content
-        return web.Response(status=status, headers=headers)
-    return web.Response(text=json.dumps(data, ensure_ascii=False),
-                        content_type='application/json', headers=headers, status=status)
+        return web.Response(status=status)
+    return web.json_response(data, status=status)
 
 async def products_api_handler(request: web.Request) -> web.Response:
     """
@@ -134,12 +128,7 @@ async def products_api_handler(request: web.Request) -> web.Response:
     origin = request.headers.get('Origin')
     logger.info(f"API request for products from origin: {origin}, method: {request.method}")
 
-    # Для preflight-запросов от браузера (метод OPTIONS)
-    if request.method == 'OPTIONS':
-        logger.info("Responding to OPTIONS preflight request with 204 No Content.")
-        return _create_api_response(None, status=204, origin=origin)
     logger.info("Processing GET request for products.")
-
     all_products = await get_all_products()
     # Добавляем логирование, чтобы видеть, сколько товаров загружено
     logger.info(f"Loaded {len(all_products)} products from products.json.")
@@ -207,7 +196,7 @@ async def products_api_handler(request: web.Request) -> web.Response:
     # Логируем итоговый результат перед отправкой
     logger.info(f"Sending catalog data to frontend. Total categories: {len(response_data)}.")
 
-    return _create_api_response(response_data, origin=origin)
+    return _create_api_response(response_data)
 
 
 async def validate_promocode_handler(request: web.Request) -> web.Response:
@@ -216,10 +205,6 @@ async def validate_promocode_handler(request: web.Request) -> web.Response:
     promocode = request.query.get('code', '').upper()
     origin = request.headers.get('Origin')
     logger.debug(f"API request to validate promocode '{promocode}' from origin: {origin}, method: {request.method}")
-
-    # Для preflight-запросов от браузера (метод OPTIONS)
-    if request.method == 'OPTIONS':
-        return _create_api_response(None, status=204, origin=origin)
 
     promocodes_db = await get_all_promocodes()
     today = datetime.now().date()
@@ -238,7 +223,7 @@ async def validate_promocode_handler(request: web.Request) -> web.Response:
                     if times_used >= usage_limit:
                         response_data = {"valid": False, "reason": "limit_reached"}
                         logger.debug(f"Promocode {promocode} has reached its usage limit.")
-                        return _create_api_response(response_data, origin=origin)
+                        return _create_api_response(response_data)
 
                 discount = promo_data.get("discount")
                 response_data = {"valid": True, "discount": discount}
@@ -253,7 +238,7 @@ async def validate_promocode_handler(request: web.Request) -> web.Response:
         response_data = {"valid": False}
         logger.debug(f"Promocode {promocode} is invalid.")
 
-    return _create_api_response(response_data, origin=origin)
+    return _create_api_response(response_data)
 
 async def main() -> None:
     setup_logging()
@@ -302,13 +287,25 @@ async def main() -> None:
 
     # Создаем веб-приложение aiohttp
     app = web.Application()
-    # Добавляем API-ручку для получения товаров
-    app.router.add_route("GET", "/api/products", products_api_handler)
-    app.router.add_route("OPTIONS", "/api/products", products_api_handler)
-    # Добавляем API-ручку для валидации промокода
-    app.router.add_route("GET", "/api/validate_promocode", validate_promocode_handler)
-    app.router.add_route("OPTIONS", "/api/validate_promocode", validate_promocode_handler)
 
+    # Настраиваем CORS централизованно
+    cors = aiohttp_cors.setup(app, defaults={
+        # Разрешаем запросы от нашего WebApp.
+        # В продакшене лучше использовать конкретный URL, а не "*".
+        WEBAPP_URL: aiohttp_cors.ResourceOptions(
+            allow_credentials=True,
+            expose_headers="*",
+            allow_headers="*",
+            allow_methods=["GET", "OPTIONS"], # Указываем разрешенные методы
+        )
+    })
+
+    # Добавляем роуты и оборачиваем их в CORS
+    product_route = cors.add(app.router.add_resource("/api/products"))
+    cors.add(product_route.add_route("GET", products_api_handler))
+    promocode_route = cors.add(app.router.add_resource("/api/validate_promocode"))
+    cors.add(promocode_route.add_route("GET", validate_promocode_handler))
+    
     # Передаем экземпляр бота в диспетчер для dependency injection
     # Это позволит получать его в хэндлерах через тайп-хинтинг (bot: Bot)
     dp["bot"] = bot
