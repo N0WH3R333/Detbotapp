@@ -19,7 +19,8 @@ CREATE TABLE IF NOT EXISTS users (
     full_name TEXT NOT NULL,
     username TEXT,
     first_seen TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-    is_blocked BOOLEAN DEFAULT FALSE
+    is_blocked BOOLEAN DEFAULT FALSE,
+    internal_note TEXT -- Новое поле для внутренних заметок о клиенте
 );
 
 -- Таблица для промокодов

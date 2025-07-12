@@ -391,6 +391,45 @@ async def add_booking_to_db(user_id: int, user_full_name: str, user_username: st
     logger.info(f"User {user_id} created a new booking with ID {booking_id}")
     return new_booking
 
+async def get_booking_by_id(booking_id: int) -> dict | None:
+    """Загружает одну запись по её ID со всей связанной информацией."""
+    pool = await get_pool()
+    sql = """
+        SELECT b.*, 
+               u.full_name as user_full_name, 
+               u.username as user_username,
+               u.is_blocked as user_is_blocked,
+               u.internal_note as user_internal_note,
+               COALESCE(
+                   (SELECT json_agg(json_build_object('type', bm.file_type, 'file_id', bm.file_id))
+                    FROM booking_media bm WHERE bm.booking_id = b.booking_id),
+                   '[]'::json
+               ) as media_files
+        FROM bookings b
+        JOIN users u ON b.user_id = u.user_id
+        WHERE b.booking_id = $1;
+    """
+    async with pool.acquire() as connection:
+        record = await connection.fetchrow(sql, booking_id)
+        if record:
+            return await _format_booking_record(record)
+        return None
+
+async def update_user_note(user_id: int, note: str) -> bool:
+    """Обновляет или добавляет внутреннюю заметку для пользователя."""
+    pool = await get_pool()
+    sql = "UPDATE users SET internal_note = $1 WHERE user_id = $2;"
+    async with pool.acquire() as connection:
+        result = await connection.execute(sql, note, user_id)
+    
+    if result == "UPDATE 1":
+        logger.info(f"Updated internal note for user {user_id}.")
+        return True
+    else:
+        # Если пользователь не найден, ничего страшного, просто логируем
+        logger.warning(f"Failed to update internal note for user {user_id} (user may not exist).")
+        return False
+
 def _format_order_record(record: dict) -> dict:
     """Вспомогательная функция для форматирования записи заказа из БД в привычный dict."""
     order = dict(record)

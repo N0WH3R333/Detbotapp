@@ -17,6 +17,7 @@ from . import block_management
 from . import promocodes
 from . import broadcast
 from . import candidates
+from . import info_cmds
 # ... import other admin routers as you create them
 
 admin_router.include_router(base.router)
@@ -28,6 +29,7 @@ admin_router.include_router(block_management.router)
 admin_router.include_router(promocodes.router)
 admin_router.include_router(broadcast.router)
 admin_router.include_router(candidates.router)
+admin_router.include_router(info_cmds.router)
 
 if ADMIN_IDS:
     admin_router.message.filter(F.from_user.id.in_(ADMIN_IDS))
