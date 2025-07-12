@@ -18,14 +18,15 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- 1. Загрузка товаров с сервера ---
     async function fetchProducts() {
         // ВАЖНО: Укажите здесь ПОЛНЫЙ ПУБЛИЧНЫЙ АДРЕС вашего бота.
-        // Этот URL должен указывать на ваш бот, а не на Netlify!
-        // Его нужно получать из консоли cloudflared при каждом запуске.
-        const backendUrl = 'https://your-public-backend-url.trycloudflare.com'; // <-- ЗАМЕНИТЕ ЭТО
-        
+        // Этот URL должен указывать на ваш бэкенд на Render.
+        const backendUrl = 'https://btdetailing.onrender.com';
         const apiUrl = `${backendUrl}/api/products`; 
-
+        
         // Лог для отладки, чтобы видеть, куда идет запрос
         console.log(`Fetching products from: ${apiUrl}`);
+
+        // Показываем индикатор загрузки
+        catalogContainer.innerHTML = '<div class="loader"></div>';
 
         try {
             const response = await fetch(apiUrl);
@@ -33,6 +34,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 throw new Error(`Ошибка сети: ${response.status}`);
             }
             const categories = await response.json();
+            // Отрисовка каталога заменит индикатор загрузки
             renderCatalog(categories);
         } catch (error) {
             catalogContainer.innerHTML = `<div class="error-message">Не удалось загрузить товары. Попробуйте позже.</div>`;
