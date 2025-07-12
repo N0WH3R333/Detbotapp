@@ -27,5 +27,15 @@ async def global_error_handler(event: ErrorEvent):
     # For all other errors, log them.
     logger.error(f"Unhandled exception for update {event.update.update_id}: {exception}", exc_info=True)
 
+    # If the error came from a callback query, we should answer it to remove the "loading" state
+    # and optionally notify the user.
+    if event.update.callback_query:
+        try:
+            await event.update.callback_query.answer(
+                "Произошла непредвиденная ошибка. Мы уже работаем над этим. Попробуйте позже.", show_alert=True
+            )
+        except Exception:
+            pass  # Ignore if we can't even answer the callback
+
     # Returning True tells aiogram that the exception is handled.
     return True

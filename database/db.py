@@ -370,8 +370,11 @@ async def add_booking_to_db(user_id: int, user_full_name: str, user_username: st
                 VALUES ($1, $2, TO_DATE($3, 'DD.MM.YYYY'), $4, $5, $6, $7, $8)
                 RETURNING booking_id;
             """
+            # PostgreSQL ожидает объект time, а не строку. Конвертируем.
+            time_obj = datetime.strptime(booking_data['time'], '%H:%M').time()
+
             booking_id = await connection.fetchval(
-                booking_sql, user_id, booking_data['service'], booking_data['date'], booking_data['time'],
+                booking_sql, user_id, booking_data['service'], booking_data['date'], time_obj,
                 int(booking_data['price']), int(booking_data.get('discount_amount', 0)),
                 booking_data.get('promocode'), json.dumps(booking_data.get('details', {}))
             )
