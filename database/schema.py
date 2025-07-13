@@ -1,9 +1,12 @@
 CREATE_TABLES_SQL = """
 -- Создаем ENUM типы для статусов, чтобы обеспечить целостность данных
+-- Для добавления нового статуса в существующую базу может потребоваться выполнить вручную:
+-- ALTER TYPE booking_status ADD VALUE 'pending_confirmation' BEFORE 'confirmed';
 DO $$
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'booking_status') THEN
-        CREATE TYPE booking_status AS ENUM ('confirmed', 'completed', 'cancelled_by_user', 'cancelled_by_admin');
+        -- Создаем тип сразу со всеми нужными значениями
+        CREATE TYPE booking_status AS ENUM ('pending_confirmation', 'confirmed', 'completed', 'cancelled_by_user', 'cancelled_by_admin');
     END IF;
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'order_status') THEN
         CREATE TYPE order_status AS ENUM ('processing', 'assembled', 'shipped', 'completed', 'cancelled');
@@ -52,7 +55,7 @@ CREATE TABLE IF NOT EXISTS bookings (
     price_rub INT NOT NULL, -- Цена в рублях
     discount_rub INT DEFAULT 0,
     promocode TEXT REFERENCES promocodes(code),
-    status booking_status DEFAULT 'confirmed',
+    status booking_status DEFAULT 'pending_confirmation',
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     details_json JSONB -- Для хранения всех деталей выбора пользователя
 );

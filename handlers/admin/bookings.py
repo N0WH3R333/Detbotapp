@@ -10,16 +10,15 @@ from aiogram.types import CallbackQuery
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.utils.keyboard import InlineKeyboardBuilder, ReplyKeyboardBuilder
 from aiogram.types import InputMediaPhoto, InputMediaVideo
-
 from database.db import (
-    get_all_bookings, cancel_booking_in_db, get_blocked_dates, get_booking_by_id,
-    add_blocked_date, remove_blocked_date
+    get_all_bookings, cancel_booking_in_db, get_blocked_dates, get_booking_by_id, update_booking_status,
+    add_blocked_date, remove_blocked_date, increment_promocode_usage
 )
 from keyboards.admin_inline import (
     get_booking_management_keyboard, get_back_to_menu_keyboard, AdminBookingsPaginator
 )
 from keyboards.calendar import create_admin_day_management_calendar, StatsCalendarCallback
-from utils.scheduler import cancel_reminder
+from utils.scheduler import cancel_reminder, schedule_reminder
 from .info_cmds import format_booking_details_for_admin
 from .states import AdminStates
 
@@ -36,6 +35,47 @@ class AdminBookingDetails(CallbackData, prefix="adm_b_details"):
     booking_id: int
     page: int
     period: str
+
+
+@router.callback_query(F.data.startswith("adm_confirm_booking:"))
+async def confirm_booking_by_admin(callback: types.CallbackQuery, bot: Bot):
+    """Обрабатывает нажатие админом кнопки 'Подтвердить запись'."""
+    try:
+        booking_id = int(callback.data.split(":")[1])
+    except (ValueError, IndexError):
+        await callback.answer("Ошибка в ID записи.", show_alert=True)
+        return
+
+    booking = await get_booking_by_id(booking_id)
+    if not booking or booking.get('status') != 'pending_confirmation':
+        await callback.answer("⚠️ Запись не найдена или уже обработана.", show_alert=True)
+        try:
+            await callback.message.delete()
+        except TelegramBadRequest:
+            pass
+        return
+
+    confirmed_booking = await update_booking_status(booking_id, 'confirmed')
+    if not confirmed_booking:
+        await callback.answer("❌ Ошибка при обновлении статуса в базе данных.", show_alert=True)
+        return
+
+    # Отправляем подтверждение пользователю
+    user_id = confirmed_booking.get('user_id')
+    user_confirmation_text = (
+        "✅ <b>Ваша запись подтверждена!</b>\n\n"
+        "Мы ждем вас в назначенное время.\n\n"
+        f"<b>Детали:</b> {confirmed_booking.get('service_name', '')} на {confirmed_booking.get('date')} в {confirmed_booking.get('time')}\n\n"
+        "📍 <b>Наш адрес:</b> Ставрополь, улица Старомарьевское шоссе 12 корпус 2"
+    )
+    await bot.send_message(user_id, user_confirmation_text)
+
+    await schedule_reminder(confirmed_booking)
+    if promocode := confirmed_booking.get("promocode"):
+        await increment_promocode_usage(promocode)
+
+    await callback.message.edit_text(f"✅ Запись #{booking_id} подтверждена. Клиент уведомлен.")
+    await callback.answer("Запись подтверждена!")
 
 
 async def _get_filtered_bookings(period: str) -> tuple[list, str]:

@@ -30,46 +30,25 @@ document.addEventListener('DOMContentLoaded', () => {
         // Показываем индикатор загрузки
         catalogContainer.innerHTML = '<div class="loader"></div>';
 
-        let rawResponseText = ''; // Объявляем здесь, чтобы была доступна в catch
         try {
             const response = await fetch(apiUrl);
             if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(`Ошибка сети: ${response.status} - ${errorText}`);
+                throw new Error(`Ошибка сети: ${response.status}`);
             }
-            // Сначала получаем ответ как текст, чтобы залогировать его
-            rawResponseText = await response.text();
-            console.log("Raw response from server:", rawResponseText);
-
-            // Теперь парсим текст в JSON. Если здесь будет ошибка, мы увидим ее в консоли.
-            allCategoriesData = JSON.parse(rawResponseText);
+            allCategoriesData = await response.json();
 
             // Сохраняем все товары в allProducts для быстрого доступа (для корзины и поиска)
             // Более надежная проверка, которая не упадет, даже если данные некорректны
             (allCategoriesData || []).forEach(cat => {
                 (cat?.subcategories || []).forEach(subcat => {
                     (subcat?.products || []).forEach(prod => {
-                        if (prod?.id) {
-                            allProducts[prod.id] = prod;
-                        }
+                        allProducts[prod.id] = prod;
                     })
                 });
             });
             renderCategoryMenu(); // Рендерим меню категорий вместо всего каталога
         } catch (error) {
-            // ВЫВОДИМ ДИАГНОСТИЧЕСКУЮ ИНФОРМАЦИЮ
-            let errorHtml = `
-                <div class="error-message" style="text-align: left; padding: 10px;">
-                    <b>Произошла критическая ошибка.</b>
-                    <p>Пожалуйста, сделайте скриншот этого сообщения и отправьте администратору.</p>
-                    <hr>
-                    <p><b>Детали ошибки:</b></p>
-                    <pre style="white-space: pre-wrap; word-break: break-all;">${error.message}</pre>
-                    <p><b>"Сырой" ответ от сервера:</b></p>
-                    <pre style="white-space: pre-wrap; word-break: break-all;">${rawResponseText || 'Ответ не получен'}</pre>
-                </div>
-            `;
-            catalogContainer.innerHTML = errorHtml;
+            catalogContainer.innerHTML = `<div class="error-message">Не удалось загрузить товары. Попробуйте позже.</div>`;
             console.error("Ошибка при загрузке товаров:", error);
         }
     }

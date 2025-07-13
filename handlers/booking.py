@@ -5,6 +5,7 @@ import logging
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, InputMediaPhoto, InputMediaVideo, User
 from datetime import datetime, date, timedelta
 from collections import Counter, defaultdict
+from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from keyboards.calendar import create_calendar, CalendarCallback
 from keyboards.inline import get_time_slots_keyboard
@@ -477,6 +478,32 @@ async def _send_admin_notification(bot: Bot, user: User, new_booking: dict, summ
         except Exception as e:
             logger.error(f"Не удалось отправить уведомление администратору {admin_id}: {e}")
 
+async def _send_admin_pending_notification(bot: Bot, user: User, new_booking: dict, summary_text: str):
+    """Отправляет уведомление о новой заявке на запись администраторам с кнопкой подтверждения."""
+    if not ADMIN_IDS:
+        return
+
+    builder = InlineKeyboardBuilder()
+    builder.button(
+        text="✅ Подтвердить запись",
+        callback_data=f"adm_confirm_booking:{new_booking['id']}"
+    )
+
+    admin_text = (
+        f"🔔 <b>Новая заявка на запись #{new_booking['id']}</b>\n\n"
+        f"<b>Клиент:</b> {user.full_name}\n"
+        f"<b>ID:</b> <code>{user.id}</code>\n"
+        f"<b>Username:</b> @{user.username or 'не указан'}\n\n"
+        f"<b>Дата и время:</b> {new_booking.get('date')} в {new_booking.get('time')}\n\n"
+        f"<b>Выбранные услуги:</b>\n{summary_text}"
+    )
+
+    for admin_id in ADMIN_IDS:
+        try:
+            await bot.send_message(admin_id, admin_text, reply_markup=builder.as_markup())
+        except Exception as e:
+            logger.error(f"Не удалось отправить уведомление о новой заявке администратору {admin_id}: {e}")
+
 async def _finalize_booking_flow(callback: CallbackQuery, state: FSMContext, new_booking: dict, summary_text: str):
     """Завершает процесс бронирования: отправляет подтверждение, планирует напоминание, инкрементирует промокод."""
     user_confirmation_text = (
@@ -538,11 +565,18 @@ async def time_chosen(callback: CallbackQuery, state: FSMContext, bot: Bot):
     # 3. Формируем сводку для уведомлений
     summary_text = await get_booking_summary(user_data)
 
-    # 4. Отправка уведомлений
-    await _send_admin_notification(bot, callback.from_user, new_booking, summary_text)
+    # 4. Отправка уведомления админу с кнопкой подтверждения
+    await _send_admin_pending_notification(bot, callback.from_user, new_booking, summary_text)
 
-    # 5. Завершение процесса
-    await _finalize_booking_flow(callback, state, new_booking, summary_text)
+    # 5. Отправка предварительного подтверждения пользователю
+    await callback.message.edit_text(
+        "✅ <b>Ваша заявка принята!</b>\n\n"
+        "Ожидайте, с вами свяжется администратор в ближайшее время для подтверждения записи."
+    )
+
+    # 6. Очистка состояния
+    await state.clear()
+    await callback.answer()
 # =============================================================================
 # Handlers for "Back" buttons
 # =============================================================================

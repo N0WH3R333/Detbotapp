@@ -415,6 +415,26 @@ async def get_booking_by_id(booking_id: int) -> dict | None:
             return await _format_booking_record(record)
         return None
 
+async def update_booking_status(booking_id: int, new_status: str) -> dict | None:
+    """Обновляет статус записи по её ID в БД и возвращает обновленную запись."""
+    pool = await get_pool()
+    # Проверяем, что новый статус валиден для ENUM типа
+    valid_statuses = ('pending_confirmation', 'confirmed', 'completed', 'cancelled_by_user', 'cancelled_by_admin')
+    if new_status not in valid_statuses:
+        logger.error(f"Attempted to set invalid booking status '{new_status}' for booking #{booking_id}")
+        return None
+
+    sql = "UPDATE bookings SET status = $1 WHERE booking_id = $2 RETURNING *;"
+    async with pool.acquire() as connection:
+        updated_record = await connection.fetchrow(sql, new_status, booking_id)
+
+    if updated_record:
+        logger.info(f"Updated status for booking #{booking_id} to '{new_status}'")
+        # Используем существующую функцию для форматирования, чтобы вернуть консистентные данные
+        return await _format_booking_record(updated_record)
+    return None
+
+
 async def update_user_note(user_id: int, note: str) -> bool:
     """Обновляет или добавляет внутреннюю заметку для пользователя."""
     pool = await get_pool()
@@ -751,6 +771,7 @@ async def delete_candidate_in_db(candidate_id: int) -> dict | None:
     else:
         logger.warning(f"Admin tried to edit non-existent order #{order_id}")
         return None
+
 async def get_blocked_users() -> list[int]:
     """Возвращает список ID заблокированных пользователей из базы данных."""
     pool = await get_pool()
