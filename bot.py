@@ -10,6 +10,7 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from aiohttp import web
 import json
 import aiohttp_cors
+from collections import defaultdict
 
 from config import (
     BOT_TOKEN, ADMIN_IDS, LOG_LEVEL, LOG_LEVEL_HANDLERS, LOG_LEVEL_DATABASE,
@@ -99,36 +100,21 @@ async def products_api_handler(request: web.Request) -> web.Response:
 
 
     # Динамическое построение категорий из данных в products.json
-    # Структура: { "ИмяКатегории": { "subcategories": { "ИмяПодкатегории": { "products": [...] } } } }
-    categories = {}
-
-    # Инициализируем все категории из конфига, чтобы они были даже пустыми
-    for category_name in SHOP_CATEGORIES:
-        categories[category_name] = {"subcategories": {}}
+    # Используем defaultdict для более простого и чистого кода
+    categories = defaultdict(lambda: defaultdict(list))
 
     for product in all_products:
-        # Более безопасная обработка: сначала получаем значение, потом обрабатываем.
-        # Это защищает от сбоя, если из базы придет None (пустое значение) вместо строки.
         category_name = (product.get("category") or "Без категории").strip()
-        # Если подкатегория не указана, помещаем товар в подкатегорию "Основное"
-        # Также делаем обработку подкатегории более надежной.
+
         subcategory_name = (product.get("subcategory") or "Основное").strip() or "Основное"
+        categories[category_name][subcategory_name].append(product)
 
-        if not category_name:
-            category_name = "Без категории"
-
-        # Создаем категорию, если ее нет (на случай, если в products.json есть категория не из конфига)
+    # Добавляем пустые категории из конфига, если их еще нет в каталоге
+    for category_name in SHOP_CATEGORIES:
         if category_name not in categories:
-            # В категории теперь только подкатегории для единой структуры
-            categories[category_name] = {"subcategories": {}}
-
-        # Создаем подкатегорию, если ее нет
-        if subcategory_name not in categories[category_name]["subcategories"]:
-            categories[category_name]["subcategories"][subcategory_name] = {"products": []}
-        
-        # Добавляем товар в его подкатегорию
-        categories[category_name]["subcategories"][subcategory_name]["products"].append(product)
-
+            # Создаем пустую запись, чтобы категория отображалась
+            categories[category_name] = defaultdict(list)
+            
     # Преобразование в формат ответа, который ожидает фронтенд
     # [ { "name": "ИмяКатегории", "subcategories": [ { "name": "ИмяПодкатегории", "products": [...] } ] } ]
     
@@ -152,11 +138,11 @@ async def products_api_handler(request: web.Request) -> web.Response:
         return new_product
 
     response_data = []
-    for cat_name, cat_data in sorted(categories.items()): # Сортируем для стабильного порядка
+    for cat_name, subcategories in sorted(categories.items()): # Сортируем для стабильного порядка
         subcategories_list = [
             # Применяем трансформацию к каждому продукту
-            {"name": sub_name, "products": [_transform_product_for_frontend(p) for p in sub_data["products"]]}
-            for sub_name, sub_data in sorted(cat_data["subcategories"].items())
+            {"name": sub_name, "products": [_transform_product_for_frontend(p) for p in products]}
+            for sub_name, products in sorted(subcategories.items())
         ]
 
         response_data.append({"name": cat_name, "subcategories": subcategories_list})
@@ -224,7 +210,7 @@ async def main() -> None:
     # Эту строку нужно выполнять только при самой первой настройке.
     # После того как вы наполнили products.json своими товарами, ее СНОВА СЛЕДУЕТ ЗАКОММЕНТИРОВАТЬ.
     # ВРЕМЕННЫЙ ВЫЗОВ ДЛЯ ПРИНУДИТЕЛЬНОЙ СИНХРОНИЗАЦИИ. ПОСЛЕ УСПЕХА ЗАКОММЕНТИРОВАТЬ!
-    # await force_sync_products_from_json()
+    # await force_sync_products_from_json() #раскоммитить с целью принуждения удаления старых товаров с заменой на новых (несет урон старой бд!!!)
 
     logging.info("Запуск бота...")
 
