@@ -33,9 +33,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const response = await fetch(apiUrl);
             if (!response.ok) {
-                // Если ответ не ОК, пытаемся прочитать текст ошибки с сервера
-                const errorText = await response.text();
-                throw new Error(`Ошибка сети: ${response.status} - ${errorText}`);
+                throw new Error(`Ошибка сети: ${response.status}`);
             }
             // Сначала получаем ответ как текст, чтобы залогировать его
             const rawResponseText = await response.text();
@@ -44,17 +42,20 @@ document.addEventListener('DOMContentLoaded', () => {
             // Теперь парсим текст в JSON. Если здесь будет ошибка, мы увидим ее в консоли.
             allCategoriesData = JSON.parse(rawResponseText);
 
-            if (Array.isArray(allCategoriesData)) {
+            // Дополнительная проверка, что данные - это массив
+            if (!Array.isArray(allCategoriesData)) {
+                throw new Error("Данные с сервера пришли в неверном формате (не массив).");
+            }
+
+            allCategoriesData.forEach(cat => {
                 // Сохраняем все товары в allProducts для быстрого доступа (для корзины и поиска)
-                allCategoriesData.forEach(cat => {
-                    cat?.subcategories?.forEach(subcat => {
-                        subcat?.products?.forEach(prod => {
-                            allProducts[prod.id] = prod;
-                        });
+                cat?.subcategories?.forEach(subcat => {
+                    subcat?.products?.forEach(prod => {
+                        allProducts[prod.id] = prod;
                     });
                 });
-            }
-            renderCategoryMenu();
+            });
+            renderCategoryMenu(); // Рендерим меню категорий вместо всего каталога
         } catch (error) {
             catalogContainer.innerHTML = `<div class="error-message">Не удалось загрузить товары. Попробуйте позже.</div>`;
             console.error("Ошибка при загрузке товаров:", error);
@@ -72,7 +73,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const menuGrid = document.createElement('div');
         menuGrid.className = 'category-menu-grid';
 
-        if (!allCategoriesData || allCategoriesData.length === 0) {
+        if (allCategoriesData.length === 0) {
             const noItems = document.createElement('p');
             noItems.textContent = 'Разделы не найдены.';
             menuGrid.appendChild(noItems);
@@ -113,14 +114,14 @@ document.addEventListener('DOMContentLoaded', () => {
         categoryTitle.textContent = selectedCategory.name;
         categoryElement.appendChild(categoryTitle);
 
-        if (!selectedCategory.subcategories || selectedCategory.subcategories.length === 0 || selectedCategory.subcategories.every(s => !s.products || s.products.length === 0)) {
+        if (selectedCategory.subcategories.length === 0 || selectedCategory.subcategories.every(s => s.products.length === 0)) {
             const noProducts = document.createElement('p');
             noProducts.className = 'info-message';
             noProducts.textContent = 'В этом разделе пока нет товаров.';
             categoryElement.appendChild(noProducts);
         } else {
             selectedCategory.subcategories.forEach(subcategory => {
-                if (subcategory.products.length === 0) return; // Не отображаем пустые подкатегории
+                if (subcategory.products.length === 0) return;
 
                 const subcategoryTitle = document.createElement('h3');
                 subcategoryTitle.className = 'subcategory-title';
