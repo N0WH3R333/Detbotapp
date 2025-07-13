@@ -223,10 +223,9 @@ async def main() -> None:
     # Наполняем БД начальными данными (товары) и создаем JSON-файлы.
     # Эту строку нужно выполнять только при самой первой настройке.
     # После того как вы наполнили products.json своими товарами, ее СНОВА СЛЕДУЕТ ЗАКОММЕНТИРОВАТЬ.
-    # await ensure_data_files_exist()
-
     # ВРЕМЕННЫЙ ВЫЗОВ ДЛЯ ПРИНУДИТЕЛЬНОЙ СИНХРОНИЗАЦИИ. ПОСЛЕ УСПЕХА ЗАКОММЕНТИРОВАТЬ!
-    await force_sync_products_from_json()
+    # await force_sync_products_from_json()
+
     logging.info("Запуск бота...")
 
     # Инициализация бота и диспетчера
@@ -285,19 +284,35 @@ async def main() -> None:
         await schedule_existing_reminders()
         schedule_reports()
         scheduler.start()
-        
-        # Запускаем веб-сервер и поллинг одновременно
-        runner = web.AppRunner(app)
-        await runner.setup()
-        # Render и другие хостинги предоставляют порт через переменную окружения PORT
-        port = int(os.environ.get("PORT", 8080))
-        # Укажите host и port, которые будут использоваться для WebApp
-        site = web.TCPSite(runner, host='0.0.0.0', port=port)
-        await site.start()
-        logging.info(f"Веб-сервер для WebApp и API запущен на http://0.0.0.0:{port}")
-        
-        await bot.delete_webhook(drop_pending_updates=True)
-        await dp.start_polling(bot)
+
+        # --- Переключаемся на вебхуки для продакшена ---
+        # Render предоставляет публичный URL в переменной окружения RENDER_EXTERNAL_URL
+        webhook_url = os.getenv("RENDER_EXTERNAL_URL")
+        if webhook_url:
+            # Устанавливаем вебхук
+            webhook_path = f"/webhook/{BOT_TOKEN}"
+            await bot.set_webhook(f"{webhook_url}{webhook_path}")
+            logging.info(f"Webhook has been set to {webhook_url}{webhook_path}")
+
+            # Добавляем обработчик для вебхука
+            from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
+            handler = SimpleRequestHandler(dispatcher=dp, bot=bot)
+            handler.register(app, path=webhook_path)
+            setup_application(app, dp, bot=bot)
+
+            # Запускаем веб-сервер
+            port = int(os.environ.get("PORT", 8080))
+            runner = web.AppRunner(app)
+            await runner.setup()
+            site = web.TCPSite(runner, host='0.0.0.0', port=port)
+            await site.start()
+            logging.info(f"Bot is running on webhook mode at http://0.0.0.0:{port}")
+            await asyncio.Event().wait() # Бесконечное ожидание
+        else:
+            # Если запускаем локально (нет RENDER_EXTERNAL_URL), используем старый добрый поллинг
+            logging.warning("RENDER_EXTERNAL_URL is not set. Running in polling mode.")
+            await bot.delete_webhook(drop_pending_updates=True)
+            await dp.start_polling(bot)
     finally:
         logging.info("Остановка бота и веб-сервера...")
         await close_pool() # Закрываем пул соединений
