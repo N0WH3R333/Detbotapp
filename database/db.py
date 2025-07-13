@@ -336,7 +336,7 @@ async def get_all_bookings() -> list[dict]:
         return [await _format_booking_record(rec) for rec in records]
 
 async def get_user_bookings(user_id: int) -> list[dict]:
-    """Возвращает все записи конкретного пользователя из БД."""
+    """Возвращает все активные и ожидающие подтверждения записи пользователя из БД."""
     pool = await get_pool()
     sql = """
         SELECT b.*,
@@ -346,7 +346,7 @@ async def get_user_bookings(user_id: int) -> list[dict]:
                    '[]'::json
                ) as media_files
         FROM bookings b
-        WHERE b.user_id = $1
+        WHERE b.user_id = $1 AND b.status IN ('pending_confirmation', 'confirmed')
         ORDER BY b.created_at DESC;
     """
     async with pool.acquire() as connection:

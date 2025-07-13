@@ -34,9 +34,14 @@ async def cmd_start(message: Message, state: FSMContext):
 
 def _format_user_bookings(bookings: list[dict]) -> str:
     """Форматирует текст со списком записей пользователя."""
-    response_text = "<b>Ваши активные записи:</b>\n\n"
+    status_map = {
+        'pending_confirmation': '⏳ Ожидает подтверждения',
+        'confirmed': '✅ Подтверждена'
+    }
+    response_text = "<b>Ваши записи:</b>\n\n"
     for booking in bookings:
-        response_text += f"<b>Запись #{booking['id']}</b>\n"
+        status_text = status_map.get(booking.get('status'), 'Неизвестен')
+        response_text += f"<b>Запись #{booking['id']} - {status_text}</b>\n"
         # Используем .get() для безопасного доступа и форматируем цену
         price_str = f" - {booking.get('price', 0):.2f} руб." if 'price' in booking else ""
         response_text += f"Услуга: {booking.get('service', 'Не указана')}{price_str}\n"
