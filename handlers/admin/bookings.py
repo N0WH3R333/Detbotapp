@@ -96,8 +96,9 @@ async def reject_booking_by_admin(callback: types.CallbackQuery, bot: Bot):
             pass
         return
 
-    # Напрямую обновляем статус на 'cancelled_by_admin' для большей надежности
-    cancelled_booking = await update_booking_status(booking_id, 'cancelled_by_admin')
+    # Используем специализированную функцию отмены. user_id=None означает, что отменяет админ.
+    # Это установит статус 'cancelled_by_admin'.
+    cancelled_booking = await cancel_booking_in_db(booking_id=booking_id, user_id=None)
     if not cancelled_booking:
         await callback.answer("❌ Ошибка при обновлении статуса в базе данных.", show_alert=True)
         return
