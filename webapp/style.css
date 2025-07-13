@@ -166,3 +166,66 @@ body {
     padding: 5px 10px;
     border-radius: 10px;
 }
+
+/* Стили для меню категорий */
+.category-menu-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 15px;
+    padding: 10px;
+}
+
+.category-menu-button {
+    padding: 20px;
+    font-size: 18px;
+    font-weight: 500;
+    border: 1px solid var(--tg-theme-button-color);
+    background-color: var(--tg-theme-bg-color);
+    color: var(--tg-theme-text-color);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background-color 0.2s, color 0.2s;
+}
+
+.category-menu-button:hover {
+    background-color: var(--tg-theme-button-color);
+    color: var(--tg-theme-button-text-color);
+}
+
+/* Кнопка "Назад" */
+.back-to-menu-btn {
+    margin: 10px 10px 0;
+    padding: 8px 12px;
+    background: none;
+    border: none;
+    color: var(--tg-theme-link-color);
+    cursor: pointer;
+    font-size: 16px;
+}
+
+/* Контейнер для поиска */
+.search-container {
+    padding: 10px;
+    background-color: var(--tg-theme-secondary-bg-color, #efeff4);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+#search-input {
+    width: 100%;
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid var(--tg-theme-hint-color);
+    background-color: var(--tg-theme-bg-color);
+    color: var(--tg-theme-text-color);
+    font-size: 16px;
+    box-sizing: border-box;
+}
+
+/* Информационные сообщения */
+.info-message {
+    text-align: center;
+    padding: 20px;
+    color: var(--tg-theme-hint-color);
+}

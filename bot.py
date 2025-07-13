@@ -13,7 +13,7 @@ import aiohttp_cors
 
 from config import (
     BOT_TOKEN, ADMIN_IDS, LOG_LEVEL, LOG_LEVEL_HANDLERS, LOG_LEVEL_DATABASE,
-    LOG_LEVEL_AIOGRAM, LOG_DIR, LOG_FILE, LOG_MAX_BYTES, LOG_BACKUP_COUNT,
+    LOG_LEVEL_AIOGRAM, LOG_DIR, LOG_FILE, LOG_MAX_BYTES, LOG_BACKUP_COUNT, SHOP_CATEGORIES,
     WEBAPP_URL, DATABASE_URL
 )
 from handlers import main_router
@@ -101,6 +101,10 @@ async def products_api_handler(request: web.Request) -> web.Response:
     # Структура: { "ИмяКатегории": { "subcategories": { "ИмяПодкатегории": { "products": [...] } } } }
     categories = {}
 
+    # Инициализируем все категории из конфига, чтобы они были даже пустыми
+    for category_name in SHOP_CATEGORIES:
+        categories[category_name] = {"subcategories": {}}
+
     for product in all_products:
         # Используем .strip() для удаления случайных пробелов.
         category_name = product.get("category", "Без категории").strip()
@@ -110,7 +114,7 @@ async def products_api_handler(request: web.Request) -> web.Response:
         if not category_name:
             category_name = "Без категории"
 
-        # Создаем категорию, если ее нет
+        # Создаем категорию, если ее нет (на случай, если в products.json есть категория не из конфига)
         if category_name not in categories:
             # В категории теперь только подкатегории для единой структуры
             categories[category_name] = {"subcategories": {}}
@@ -213,8 +217,10 @@ async def main() -> None:
     # Инициализируем таблицы в базе данных
     await init_db()
 
-    # Наполняем БД начальными данными (товары) и создаем JSON-файлы
-    await ensure_data_files_exist()
+    # Наполняем БД начальными данными (товары) и создаем JSON-файлы.
+    # Эту строку нужно выполнять только при самой первой настройке.
+    # После того как вы наполнили products.json своими товарами, ее следует закомментировать.
+    # await ensure_data_files_exist()
 
     logging.info("Запуск бота...")
 

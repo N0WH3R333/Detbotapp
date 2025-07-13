@@ -7,11 +7,18 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div id="app-container">
-        <main id="catalog-container">
-            <div class="loader">Загрузка товаров...</div>
-        </main>
+    <!-- Контейнер для поиска, который будет всегда сверху -->
+    <div class="search-container">
+        <input type="text" id="search-input" placeholder="🔍 Найти товар по названию...">
     </div>
+
+    <!-- Основной контейнер, где будут отображаться категории или товары -->
+    <main id="catalog-container">
+        <div class="loader">Загрузка товаров...</div>
+    </main>
+
+    <!-- Отдельный контейнер для результатов поиска -->
+    <div id="search-results-container" style="display: none;"></div>
 
     <!-- Модальное окно для галереи -->
     <div id="gallery-modal" class="modal">
@@ -28,4 +35,3 @@
     <script src="script.js"></script>
 </body>
 </html>
-

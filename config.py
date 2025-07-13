@@ -54,5 +54,11 @@ WEEKLY_REPORT_DAY_OF_WEEK = _get_env_var("WEEKLY_REPORT_DAY_OF_WEEK", "sun")
 WEEKLY_REPORT_TIME = _get_env_var("WEEKLY_REPORT_TIME", "22:00")
 MAX_PARALLEL_BOOKINGS = _get_env_var("MAX_PARALLEL_BOOKINGS", 12, int)
 
+# Список категорий магазина, которые должны отображаться всегда, даже если они пусты.
+SHOP_CATEGORIES = [
+    "продукция SEVEN",
+    "Автоаксессуары"
+]
+
 # --- Database Configuration ---
 DATABASE_URL = os.getenv("DATABASE_URL")

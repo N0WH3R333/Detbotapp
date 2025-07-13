@@ -1,5 +1,5 @@
-{
-  "EMIK": {
+  [
+  {
     "id": "EMIK",
     "name": "Эмульсионный шампунь для первой фазы мойки",
     "price": 1,
@@ -13,7 +13,7 @@
       "https://i.postimg.cc/zD4BQjjv/IMG-6710.jpg"
     ]
   },
-  "FOMIK": {
+  {
     "id": "FOMIK",
     "name": "Высокопенный шампунь для первой фазы мойки FOMIK",
     "price": 1,
@@ -27,8 +27,8 @@
       "https://i.postimg.cc/431Hk93M/IMG-6736.jpg"
     ]
   },
-  "ACID FASE": {
-    "id": "ACID FASE",
+  {
+    "id": "ACID_FASE",
     "name": "Кислотный шампунь для второй фазы мойки ACID FASE",
     "price": 7888850,
     "category": "Автохимия",
@@ -41,7 +41,7 @@
       "https://i.postimg.cc/WzyXGKLM/IMG-6757.jpg"
     ]
   },
-  "RADIATIX": {
+  {
     "id": "RADIATIX",
     "name": "средство для очистки внешней поверхности радиаторов RADIATIX",
     "price": 750,
@@ -55,7 +55,7 @@
       "https://i.postimg.cc/sXG0xsZp/IMG-6717.jpg"
     ]
   },
-  "KLINTUB": {
+  {
     "id": "KLINTUB",
     "name": "Средство для очитски патрубков и др. резиновых элементов KLINTUB",
     "price": 750,
@@ -69,7 +69,7 @@
       "https://i.postimg.cc/QCbPGSTP/IMG-6748.jpg"
     ]
   },
-  "KLINOL": {
+  {
     "id": "KLINOL",
     "name": "универсальный очиститель любых поверхностей KLINOL",
     "price": 750,
@@ -83,7 +83,7 @@
       "https://i.postimg.cc/yY9x9bRB/IMG-6751.jpg"
     ]
   },
-  "CHERRYON": {
+  {
     "id": "CHERRYON",
     "name": "очиститель металлических вкраплений и колодочной пыли CHERRYON",
     "price": 750,
@@ -97,7 +97,7 @@
       "https://i.postimg.cc/tTZZcCsn/IMG-6739.jpg"
     ]
   },
-  "KOMAROFF": {
+  {
     "id": "KOMAROFF",
     "name": "Очиститель следов насекомых KOMAROFF",
     "price": 750,
@@ -111,8 +111,8 @@
       "https://i.postimg.cc/GprnNM9F/IMG-6723.jpg"
     ]
   },
-  "ABRASIVE GLASS CLEANER": {
-    "id": "ABRASIVE GLASS CLEANER",
+  {
+    "id": "ABRASIVE_GLASS_CLEANER",
     "name": "Паста полировальная для стекла ABRASIVE GLASS CLEANER",
     "price": 750,
     "category": "Автохимия",
@@ -125,7 +125,7 @@
       "https://i.postimg.cc/ZnJ95Pfp/IMG-6707.jpg"
     ]
   },
-  "QUARTSIK": {
+  {
     "id": "QUARTSIK",
     "name": "Кварцевое пократые QUARTSIK",
     "price": 750,
@@ -139,8 +139,8 @@
       "https://i.postimg.cc/VvBz53Sk/IMG-6720.jpg"
     ]
   },
-  "TIRE CLEANER": {
-    "id": "TIRE CLEANER",
+  {
+    "id": "TIRE_CLEANER",
     "name": "Очиститель покрыше и резины TIRE CLEANER",
     "price": 750,
     "category": "Автохимия",
@@ -153,7 +153,7 @@
       "https://i.postimg.cc/8PN6wGmw/IMG-6742.jpg"
     ]
   },
-  "KONVANT": {
+  {
     "id": "KONVANT",
     "name": "Консервант подкапотного пространства KONVANT",
     "price": 750,
@@ -167,8 +167,8 @@
       "https://i.postimg.cc/7L2hwtNf/IMG-6733.jpg"
     ]
   },
-  "ACID TEXTILE SHAMPOO": {
-    "id": "ACID TEXTILE SHAMPOO",
+  {
+    "id": "ACID_TEXTILE_SHAMPOO",
     "name": "Нейтрализатор щелочи ACID TEXTILE SHAMPOO",
     "price": 750,
     "category": "Автохимия",
@@ -181,7 +181,7 @@
       "https://i.postimg.cc/TYKXzL0P/IMG-6754.jpg"
     ]
   },
-  "DIELECTRIC": {
+  {
     "id": "DIELECTRIC",
     "name": "диэлектрик DIELECTRIC",
     "price": 750,
@@ -195,8 +195,8 @@
       "https://i.postimg.cc/Rhf20fD1/IMG-6713.jpg"
     ]
   },
-  "LEATHER CLEANER": {
-    "id": "LEATHER CLEANER",
+  {
+    "id": "LEATHER_CLEANER",
     "name": "Очиститель кожи LEATHER CLEANER",
     "price": 750,
     "category": "Автохимия",
@@ -209,8 +209,8 @@
       "https://i.postimg.cc/c1MmdXD9/IMG-6745.jpg"
     ]
   },
-  "AQUA STOP": {
-    "id": "AQUA STOP",
+  {
+    "id": "AQUA_STOP",
     "name": "Анти дождь AQUA STOP",
     "price": 750,
     "category": "Автохимия",
@@ -223,8 +223,8 @@
       "https://i.postimg.cc/pXKgbg4m/IMG-6726.jpg"
     ]
   },
-  "LEATHER LOTION MATT": {
-    "id": "LEATHER LOTION MATT",
+  {
+    "id": "LEATHER_LOTION_MATT",
     "name": "Лосьон для кожи матовый LEATHER LOTION MATT",
     "price": 750,
     "category": "Автохимия",
@@ -237,8 +237,8 @@
       "https://i.postimg.cc/L4D1CX65/IMG-6729.jpg"
     ]
   },
-  "METAL POLISH COTTON": {
-    "id": "METAL POLISH COTTON",
+  {
+    "id": "METAL_POLISH_COTTON",
     "name": "вата для очистки и полеровки металлов 4г METAL POLISH COTTON",
     "price": 750,
     "category": "Автохимия",
@@ -249,7 +249,7 @@
       "https://i.postimg.cc/rpY80B88/IMG-6705.jpg"
     ]
   },
-  "VATIX": {
+  {
     "id": "VATIX",
     "name": "VATIX 10г (METAL POLISH COTTON)",
     "price": 750,
@@ -261,7 +261,7 @@
       "https://i.postimg.cc/76vWW993/IMG-6731.jpg"
     ]
   },
-  "seven_cleaner_001": {
+  {
     "id": "seven_cleaner_001",
     "name": "Очиститель салона SEVEN",
     "price": 750,
@@ -275,4 +275,4 @@
       "https://example.com/path/to/detail_photo_3.jpg"
     ]
   }
-}
+]
