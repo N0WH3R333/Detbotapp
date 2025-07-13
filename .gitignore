@@ -35,3 +35,7 @@ htmlcov/
 dist/
 build/
 *.egg-info/
+
+# Файлы IDE
+.idea/
+.vscode/

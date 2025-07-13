@@ -16,8 +16,8 @@ from config import (
     LOG_LEVEL_AIOGRAM, LOG_DIR, LOG_FILE, LOG_MAX_BYTES, LOG_BACKUP_COUNT,
     WEBAPP_URL, DATABASE_URL
 )
-from handlers import common, booking, webapp_shop, group_management, hiring, errors
-from handlers.admin import admin_router
+from handlers import main_router
+from handlers import errors # Обработчик ошибок подключаем отдельно
 from database.pool import get_pool, close_pool
 from database.db_setup import init_db
 from database.db import (
@@ -229,18 +229,12 @@ async def main() -> None:
     # Регистрируем middleware для блокировки
     dp.update.outer_middleware(BlockMiddleware())
 
-    # Подключаем обработчик ошибок. Важно, чтобы он был в основном диспетчере.
-    dp.include_router(errors.router)
+    # Подключаем главный роутер, который содержит всю логику бота
+    dp.include_router(main_router)
 
-    # Подключаем роутеры
-    dp.include_router(common.router)
-    dp.include_router(booking.router)
-    dp.include_router(webapp_shop.router)
-    dp.include_router(group_management.router)
-    dp.include_router(hiring.router)
-    
-    # Подключаем единый роутер админ-панели.
-    dp.include_router(admin_router)
+    # Подключаем обработчик ошибок. Он должен быть последним,
+    # чтобы ловить ошибки из всех предыдущих роутеров.
+    dp.include_router(errors.router)
 
     # Создаем веб-приложение aiohttp
     app = web.Application()

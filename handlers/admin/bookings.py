@@ -8,7 +8,7 @@ from aiogram.filters.callback_data import CallbackData
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery
 from aiogram.exceptions import TelegramBadRequest
-from aiogram.utils.keyboard import InlineKeyboardBuilder
+from aiogram.utils.keyboard import InlineKeyboardBuilder, ReplyKeyboardBuilder
 from aiogram.types import InputMediaPhoto, InputMediaVideo
 
 from database.db import (
@@ -157,6 +157,7 @@ async def show_bookings_period(callback: CallbackQuery):
 @router.callback_query(AdminBookingDetails.filter())
 async def show_booking_details(callback: types.CallbackQuery, callback_data: AdminBookingDetails, bot: Bot):
     """Показывает детальную информацию о записи по кнопке 'Подробнее'."""
+    await callback.answer("Загружаю детали...")
     booking_id = callback_data.booking_id
     booking = await get_booking_by_id(booking_id)
 
@@ -165,31 +166,36 @@ async def show_booking_details(callback: types.CallbackQuery, callback_data: Adm
         return
 
     info_text = format_booking_details_for_admin(booking)
-    
-    # Создаем кнопку "Назад"
+
     builder = InlineKeyboardBuilder()
     builder.button(
         text="⬅️ Назад к списку",
-        # Используем пагинатор с действием "noop", чтобы вернуться на ту же страницу
         callback_data=AdminBookingsPaginator(action="noop", page=callback_data.page, period=callback_data.period).pack()
     )
 
-    # Сначала редактируем сообщение с текстовой информацией
-    await callback.message.edit_text(info_text, reply_markup=builder.as_markup())
-
-    # Затем, если есть медиа, отправляем их отдельным сообщением
     media_files = booking.get("media_files", [])
-    if media_files:
-        if len(media_files) == 1:
-            media = media_files[0]
-            await (bot.send_photo(callback.from_user.id, photo=media['file_id']) if media['type'] == 'photo'
-                   else bot.send_video(callback.from_user.id, video=media['file_id']))
-        else:
-            media_group = [InputMediaPhoto(media=m['file_id']) if m['type'] == 'photo' else InputMediaVideo(media=m['file_id']) for m in media_files]
-            await bot.send_media_group(callback.from_user.id, media=media_group)
-    
-    await callback.answer()
-    
+
+    try:
+        await callback.message.delete()
+    except TelegramBadRequest as e:
+        logger.warning(f"Could not delete message {callback.message.message_id} in chat {callback.message.chat.id}: {e}")
+
+    if not media_files:
+        await bot.send_message(callback.from_user.id, info_text, reply_markup=builder.as_markup())
+    elif len(media_files) == 1:
+        media = media_files[0]
+        send_func = bot.send_photo if media['type'] == 'photo' else bot.send_video
+        await send_func(callback.from_user.id, media['file_id'], caption=info_text, reply_markup=builder.as_markup())
+    else:
+        media_group = []
+        for i, m in enumerate(media_files):
+            caption = info_text if i == 0 else None
+            media_input = InputMediaPhoto(media=m['file_id'], caption=caption) if m['type'] == 'photo' else InputMediaVideo(media=m['file_id'], caption=caption)
+            media_group.append(media_input)
+        await bot.send_media_group(callback.from_user.id, media=media_group)
+        # Из-за ограничений API, клавиатуру для медиа-группы нужно отправлять отдельным сообщением
+        await bot.send_message(callback.from_user.id, "Меню управления:", reply_markup=builder.as_markup())
+
 @router.callback_query(AdminBookingsPaginator.filter())
 async def paginate_admin_bookings(callback: CallbackQuery, callback_data: AdminBookingsPaginator):
     page = callback_data.page + 1 if callback_data.action == "next" else callback_data.page - 1

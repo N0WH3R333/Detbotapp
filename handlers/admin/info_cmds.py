@@ -84,12 +84,13 @@ async def get_booking_info(message: Message, command: CommandObject, bot: Bot):
         else:
             await bot.send_video(message.chat.id, video=media['file_id'], caption=info_text)
     else:
-        await message.answer(info_text)
-        media_group = [
-            InputMediaPhoto(media=m['file_id']) if m['type'] == 'photo'
-            else InputMediaVideo(media=m['file_id'])
-            for m in media_files
-        ]
+        media_group = []
+        for i, m in enumerate(media_files):
+            caption = info_text if i == 0 else None
+            if m['type'] == 'photo':
+                media_group.append(InputMediaPhoto(media=m['file_id'], caption=caption))
+            else:
+                media_group.append(InputMediaVideo(media=m['file_id'], caption=caption))
         await bot.send_media_group(message.chat.id, media=media_group)
 
 @router.message(Command("note"))
