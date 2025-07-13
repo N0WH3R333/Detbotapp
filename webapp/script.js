@@ -21,8 +21,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- 1. Загрузка товаров с сервера ---
     async function fetchProducts() {
-        // Используем относительный путь. Запрос пойдет на тот же домен, с которого загружена страница.
-        const apiUrl = '/api/products'; 
+        // Используем ПОЛНЫЙ АБСОЛЮТНЫЙ путь к вашему серверу на Render.
+        const apiUrl = 'https://btdetailing.onrender.com/api/products'; 
         
         // Лог для отладки, чтобы видеть, куда идет запрос
         console.log(`Fetching products from: ${apiUrl}`);
