@@ -5,7 +5,7 @@ import logging
 from aiogram.types import Message, CallbackQuery, ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove, InputMediaPhoto, InputMediaVideo, User
 from datetime import datetime, date, timedelta
 from collections import Counter, defaultdict
-from aiogram.utils.keyboard import InlineKeyboardBuilder
+from aiogram.utils.keyboard import InlineKeyboardBuilder, ReplyKeyboardBuilder
 
 from keyboards.calendar import create_calendar, CalendarCallback
 from keyboards.inline import get_time_slots_keyboard
