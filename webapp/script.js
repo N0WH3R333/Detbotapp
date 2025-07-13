@@ -37,9 +37,9 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             allCategoriesData = await response.json();
             // Сохраняем все товары в allProducts для быстрого доступа (для корзины и поиска)
-            allCategoriesData.forEach(cat => {
-                cat.subcategories.forEach(subcat => {
-                    subcat.products.forEach(prod => {
+            allCategoriesData?.forEach(cat => {
+                cat?.subcategories?.forEach(subcat => {
+                    subcat?.products?.forEach(prod => {
                         allProducts[prod.id] = prod;
                     });
                 });

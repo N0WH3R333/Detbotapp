@@ -104,15 +104,13 @@ async def products_api_handler(request: web.Request) -> web.Response:
     categories = defaultdict(lambda: defaultdict(list))
 
     for product in all_products:
-        category_name = (product.get("category") or "Без категории").strip()
-
+        category_name = (product.get("category") or "Без категории").strip() or "Без категории"
         subcategory_name = (product.get("subcategory") or "Основное").strip() or "Основное"
         categories[category_name][subcategory_name].append(product)
 
     # Добавляем пустые категории из конфига, если их еще нет в каталоге
     for category_name in SHOP_CATEGORIES:
         if category_name not in categories:
-            # Создаем пустую запись, чтобы категория отображалась
             categories[category_name] = defaultdict(list)
             
     # Преобразование в формат ответа, который ожидает фронтенд
@@ -141,7 +139,7 @@ async def products_api_handler(request: web.Request) -> web.Response:
     for cat_name, subcategories in sorted(categories.items()): # Сортируем для стабильного порядка
         subcategories_list = [
             # Применяем трансформацию к каждому продукту
-            {"name": sub_name, "products": [_transform_product_for_frontend(p) for p in products]}
+            {"name": sub_name, "products": [_transform_product_for_frontend(p) for p in products] if products else []}
             for sub_name, products in sorted(subcategories.items())
         ]
 
