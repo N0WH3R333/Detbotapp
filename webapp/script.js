@@ -30,25 +30,22 @@ document.addEventListener('DOMContentLoaded', () => {
         // Показываем индикатор загрузки
         catalogContainer.innerHTML = '<div class="loader"></div>';
 
+        let rawResponseText = ''; // Объявляем здесь, чтобы была доступна в catch
         try {
             const response = await fetch(apiUrl);
             if (!response.ok) {
-                throw new Error(`Ошибка сети: ${response.status}`);
+                const errorText = await response.text();
+                throw new Error(`Ошибка сети: ${response.status} - ${errorText}`);
             }
             // Сначала получаем ответ как текст, чтобы залогировать его
-            const rawResponseText = await response.text();
+            rawResponseText = await response.text();
             console.log("Raw response from server:", rawResponseText);
 
             // Теперь парсим текст в JSON. Если здесь будет ошибка, мы увидим ее в консоли.
             allCategoriesData = JSON.parse(rawResponseText);
 
-            // Дополнительная проверка, что данные - это массив
-            if (!Array.isArray(allCategoriesData)) {
-                throw new Error("Данные с сервера пришли в неверном формате (не массив).");
-            }
-
-            allCategoriesData.forEach(cat => {
-                // Сохраняем все товары в allProducts для быстрого доступа (для корзины и поиска)
+            // Сохраняем все товары в allProducts для быстрого доступа (для корзины и поиска)
+            allCategoriesData?.forEach(cat => {
                 cat?.subcategories?.forEach(subcat => {
                     subcat?.products?.forEach(prod => {
                         allProducts[prod.id] = prod;
@@ -57,7 +54,19 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             renderCategoryMenu(); // Рендерим меню категорий вместо всего каталога
         } catch (error) {
-            catalogContainer.innerHTML = `<div class="error-message">Не удалось загрузить товары. Попробуйте позже.</div>`;
+            // ВЫВОДИМ ДИАГНОСТИЧЕСКУЮ ИНФОРМАЦИЮ
+            let errorHtml = `
+                <div class="error-message" style="text-align: left; padding: 10px;">
+                    <b>Произошла критическая ошибка.</b>
+                    <p>Пожалуйста, сделайте скриншот этого сообщения и отправьте администратору.</p>
+                    <hr>
+                    <p><b>Детали ошибки:</b></p>
+                    <pre style="white-space: pre-wrap; word-break: break-all;">${error.message}</pre>
+                    <p><b>"Сырой" ответ от сервера:</b></p>
+                    <pre style="white-space: pre-wrap; word-break: break-all;">${rawResponseText || 'Ответ не получен'}</pre>
+                </div>
+            `;
+            catalogContainer.innerHTML = errorHtml;
             console.error("Ошибка при загрузке товаров:", error);
         }
     }
