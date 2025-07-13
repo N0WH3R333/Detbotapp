@@ -106,10 +106,12 @@ async def products_api_handler(request: web.Request) -> web.Response:
         categories[category_name] = {"subcategories": {}}
 
     for product in all_products:
-        # Используем .strip() для удаления случайных пробелов.
-        category_name = product.get("category", "Без категории").strip()
+        # Более безопасная обработка: сначала получаем значение, потом обрабатываем.
+        # Это защищает от сбоя, если из базы придет None (пустое значение) вместо строки.
+        category_name = (product.get("category") or "Без категории").strip()
         # Если подкатегория не указана, помещаем товар в подкатегорию "Основное"
-        subcategory_name = (product.get("subcategory") or "").strip() or "Основное"
+        # Также делаем обработку подкатегории более надежной.
+        subcategory_name = (product.get("subcategory") or "Основное").strip() or "Основное"
 
         if not category_name:
             category_name = "Без категории"
