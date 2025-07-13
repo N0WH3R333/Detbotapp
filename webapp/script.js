@@ -33,18 +33,28 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const response = await fetch(apiUrl);
             if (!response.ok) {
-                throw new Error(`Ошибка сети: ${response.status}`);
+                // Если ответ не ОК, пытаемся прочитать текст ошибки с сервера
+                const errorText = await response.text();
+                throw new Error(`Ошибка сети: ${response.status} - ${errorText}`);
             }
-            allCategoriesData = await response.json();
-            // Сохраняем все товары в allProducts для быстрого доступа (для корзины и поиска)
-            allCategoriesData?.forEach(cat => {
-                cat?.subcategories?.forEach(subcat => {
-                    subcat?.products?.forEach(prod => {
-                        allProducts[prod.id] = prod;
+            // Сначала получаем ответ как текст, чтобы залогировать его
+            const rawResponseText = await response.text();
+            console.log("Raw response from server:", rawResponseText);
+
+            // Теперь парсим текст в JSON. Если здесь будет ошибка, мы увидим ее в консоли.
+            allCategoriesData = JSON.parse(rawResponseText);
+
+            if (Array.isArray(allCategoriesData)) {
+                // Сохраняем все товары в allProducts для быстрого доступа (для корзины и поиска)
+                allCategoriesData.forEach(cat => {
+                    cat?.subcategories?.forEach(subcat => {
+                        subcat?.products?.forEach(prod => {
+                            allProducts[prod.id] = prod;
+                        });
                     });
                 });
-            });
-            renderCategoryMenu(); // Рендерим меню категорий вместо всего каталога
+            }
+            renderCategoryMenu();
         } catch (error) {
             catalogContainer.innerHTML = `<div class="error-message">Не удалось загрузить товары. Попробуйте позже.</div>`;
             console.error("Ошибка при загрузке товаров:", error);
@@ -62,7 +72,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const menuGrid = document.createElement('div');
         menuGrid.className = 'category-menu-grid';
 
-        if (allCategoriesData.length === 0) {
+        if (!allCategoriesData || allCategoriesData.length === 0) {
             const noItems = document.createElement('p');
             noItems.textContent = 'Разделы не найдены.';
             menuGrid.appendChild(noItems);
@@ -103,7 +113,7 @@ document.addEventListener('DOMContentLoaded', () => {
         categoryTitle.textContent = selectedCategory.name;
         categoryElement.appendChild(categoryTitle);
 
-        if (selectedCategory.subcategories.length === 0 || selectedCategory.subcategories.every(s => s.products.length === 0)) {
+        if (!selectedCategory.subcategories || selectedCategory.subcategories.length === 0 || selectedCategory.subcategories.every(s => !s.products || s.products.length === 0)) {
             const noProducts = document.createElement('p');
             noProducts.className = 'info-message';
             noProducts.textContent = 'В этом разделе пока нет товаров.';
