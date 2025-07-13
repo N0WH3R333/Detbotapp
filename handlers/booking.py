@@ -15,7 +15,9 @@ from keyboards.booking_keyboards import (
     get_dry_cleaning_next_step_keyboard, get_interior_type_keyboard,
     get_dirt_level_keyboard, get_promocode_keyboard, get_comment_keyboard
 )
-from database.db import add_booking_to_db, get_all_prices, get_all_bookings, get_blocked_dates, get_all_promocodes, increment_promocode_usage
+from database.db import (
+    add_booking_to_db, get_all_prices, get_blocked_dates, get_all_promocodes,
+    increment_promocode_usage, get_bookings_for_occupancy)
 from utils.scheduler import schedule_reminder
 from utils.constants import ALL_NAMES, WORKING_HOURS
 from config import ADMIN_IDS, MAX_PARALLEL_BOOKINGS
@@ -167,7 +169,7 @@ async def get_unavailable_dates_for_month(year: int, month: int) -> list[date]:
     """
     # 1. Получаем все данные один раз
     manually_blocked_raw = await get_blocked_dates()
-    all_bookings = await get_all_bookings()
+    all_bookings = await get_bookings_for_occupancy()
 
     # 2. Фильтруем заблокированные вручную даты для текущего месяца
     unavailable_dates = set()
@@ -373,7 +375,7 @@ async def get_time_slots_occupancy(selected_date: date) -> dict[str, int]:
 
     logger.debug(f"get_time_slots_occupancy: Checking for date: {selected_date}")
     selected_date_str = selected_date.strftime("%d.%m.%Y")
-    all_bookings = await get_all_bookings()
+    all_bookings = await get_bookings_for_occupancy()
     bookings_on_date = [b for b in all_bookings if b.get('date') == selected_date_str]
     time_slot_counts = Counter(b.get('time') for b in bookings_on_date)
     logger.debug(f"get_time_slots_occupancy: Found occupancy: {time_slot_counts}")

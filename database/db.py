@@ -335,6 +335,24 @@ async def get_all_bookings() -> list[dict]:
         records = await connection.fetch(sql)
         return [await _format_booking_record(rec) for rec in records]
 
+async def get_bookings_for_occupancy() -> list[dict]:
+    """
+    Загружает все записи, которые влияют на занятость слотов ('pending_confirmation', 'confirmed').
+    Возвращает только необходимые для подсчета поля для эффективности.
+    """
+    pool = await get_pool()
+    sql = """
+        SELECT booking_date, booking_time
+        FROM bookings
+        WHERE status IN ('pending_confirmation', 'confirmed');
+    """
+    async with pool.acquire() as connection:
+        records = await connection.fetch(sql)
+        return [
+            {'date': rec['booking_date'].strftime('%d.%m.%Y'), 'time': rec['booking_time'].strftime('%H:%M')}
+            for rec in records
+        ]
+
 async def get_user_bookings(user_id: int) -> list[dict]:
     """Возвращает все активные и ожидающие подтверждения записи пользователя из БД."""
     pool = await get_pool()
