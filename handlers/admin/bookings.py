@@ -78,6 +78,38 @@ async def confirm_booking_by_admin(callback: types.CallbackQuery, bot: Bot):
     await callback.answer("Запись подтверждена!")
 
 
+@router.callback_query(F.data.startswith("adm_reject_booking:"))
+async def reject_booking_by_admin(callback: types.CallbackQuery, bot: Bot):
+    """Обрабатывает нажатие админом кнопки 'Отклонить' для новой заявки."""
+    try:
+        booking_id = int(callback.data.split(":")[1])
+    except (ValueError, IndexError):
+        await callback.answer("Ошибка в ID записи.", show_alert=True)
+        return
+
+    booking = await get_booking_by_id(booking_id)
+    if not booking or booking.get('status') != 'pending_confirmation':
+        await callback.answer("⚠️ Заявка не найдена или уже обработана.", show_alert=True)
+        try:
+            await callback.message.delete()
+        except TelegramBadRequest:
+            pass
+        return
+
+    # Используем существующую функцию отмены, она установит статус 'cancelled_by_admin'
+    cancelled_booking = await cancel_booking_in_db(booking_id=booking_id, user_id=None)
+    if not cancelled_booking:
+        await callback.answer("❌ Ошибка при обновлении статуса в базе данных.", show_alert=True)
+        return
+
+    # Отправляем уведомление пользователю об отклонении
+    user_id = cancelled_booking.get('user_id')
+    user_rejection_text = "❗️ <b>Ваша заявка на запись была отклонена.</b>\n\nК сожалению, мы не можем принять вашу запись в указанное время. Пожалуйста, попробуйте выбрать другое время или свяжитесь с нами для уточнения деталей."
+    await bot.send_message(user_id, user_rejection_text)
+
+    await callback.message.edit_text(f"❌ Заявка #{booking_id} отклонена. Клиент уведомлен.")
+    await callback.answer("Заявка отклонена!")
+
 async def _get_filtered_bookings(period: str) -> tuple[list, str]:
     """Возвращает отфильтрованный и отсортированный список записей и заголовок."""
     all_bookings = await get_all_bookings()

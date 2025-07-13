@@ -358,10 +358,18 @@ async def add_booking_to_db(user_id: int, user_full_name: str, user_username: st
     pool = await get_pool()
     async with pool.acquire() as connection:
         async with connection.transaction():
-            # 1. Убедимся, что пользователь существует
+            # 1. Убедимся, что пользователь существует и обновим его данные, включая номер телефона
+            phone_number = booking_data.get("phone_number")
             await connection.execute(
-                "INSERT INTO users (user_id, full_name, username) VALUES ($1, $2, $3) ON CONFLICT (user_id) DO UPDATE SET full_name = EXCLUDED.full_name, username = EXCLUDED.username;",
-                user_id, user_full_name, user_username
+                """
+                INSERT INTO users (user_id, full_name, username, phone_number) 
+                VALUES ($1, $2, $3, $4) 
+                ON CONFLICT (user_id) DO UPDATE SET 
+                    full_name = EXCLUDED.full_name, 
+                    username = EXCLUDED.username,
+                    phone_number = COALESCE(EXCLUDED.phone_number, users.phone_number);
+                """,
+                user_id, user_full_name, user_username, phone_number
             )
 
             # 2. Добавляем основную запись
@@ -397,6 +405,7 @@ async def get_booking_by_id(booking_id: int) -> dict | None:
     sql = """
         SELECT b.*, 
                u.full_name as user_full_name, 
+               u.phone_number as user_phone_number,
                u.username as user_username,
                u.is_blocked as user_is_blocked,
                u.internal_note as user_internal_note,

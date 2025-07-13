@@ -34,6 +34,9 @@ def format_booking_details_for_admin(booking: dict) -> str:
     if service_details_str:
         service_details_str = "\n" + service_details_str
 
+    phone_number = booking.get('user_phone_number')
+    phone_text = f"  - Телефон: <code>{phone_number}</code>\n" if phone_number else ""
+
     text = (
         f"📄 <b>Детали записи #{booking['id']}</b>\n"
         f"<b>Статус:</b> {booking.get('status', 'N/A')}\n\n"
@@ -46,6 +49,7 @@ def format_booking_details_for_admin(booking: dict) -> str:
         f"👤 <b>Клиент:</b>\n"
         f"  - Имя: {booking.get('user_full_name', 'N/A')}\n"
         f"  - ID: <code>{booking.get('user_id')}</code>\n"
+        f"{phone_text}"
         f"  - Username: @{booking.get('user_username') or 'скрыт'}\n"
         f"  - Заблокирован: {'Да' if booking.get('user_is_blocked') else 'Нет'}\n"
         f"  - 📝 <b>Заметка:</b>\n<pre>{booking.get('user_internal_note') or 'Пусто'}</pre>\n\n"

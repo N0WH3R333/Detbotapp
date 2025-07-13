@@ -2,7 +2,7 @@ from aiogram import Router, F, Bot
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 import logging
-from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, InputMediaPhoto, InputMediaVideo, User
+from aiogram.types import Message, CallbackQuery, ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove, InputMediaPhoto, InputMediaVideo, User
 from datetime import datetime, date, timedelta
 from collections import Counter, defaultdict
 from aiogram.utils.keyboard import InlineKeyboardBuilder
@@ -41,6 +41,7 @@ class Booking(StatesGroup):
     # Состояния для выбора даты и времени
     choosing_date = State()
     choosing_time = State()
+    requesting_contact = State()
     entering_promocode = State()
 
 # =============================================================================
@@ -478,21 +479,29 @@ async def _send_admin_notification(bot: Bot, user: User, new_booking: dict, summ
         except Exception as e:
             logger.error(f"Не удалось отправить уведомление администратору {admin_id}: {e}")
 
-async def _send_admin_pending_notification(bot: Bot, user: User, new_booking: dict, summary_text: str):
+async def _send_admin_pending_notification(bot: Bot, user: User, new_booking: dict, summary_text: str, phone_number: str | None):
     """Отправляет уведомление о новой заявке на запись администраторам с кнопкой подтверждения."""
     if not ADMIN_IDS:
         return
 
     builder = InlineKeyboardBuilder()
+    # Делаем кнопки более компактными
     builder.button(
-        text="✅ Подтвердить запись",
+        text="✅ Подтвердить",
         callback_data=f"adm_confirm_booking:{new_booking['id']}"
     )
+    builder.button(
+        text="❌ Отклонить",
+        callback_data=f"adm_reject_booking:{new_booking['id']}"
+    )
+
+    phone_text = f"<b>Телефон:</b> <code>{phone_number}</code>\n" if phone_number else ""
 
     admin_text = (
         f"🔔 <b>Новая заявка на запись #{new_booking['id']}</b>\n\n"
         f"<b>Клиент:</b> {user.full_name}\n"
         f"<b>ID:</b> <code>{user.id}</code>\n"
+        f"{phone_text}\n"
         f"<b>Username:</b> @{user.username or 'не указан'}\n\n"
         f"<b>Дата и время:</b> {new_booking.get('date')} в {new_booking.get('time')}\n\n"
         f"<b>Выбранные услуги:</b>\n{summary_text}"
@@ -528,55 +537,91 @@ async def _finalize_booking_flow(callback: CallbackQuery, state: FSMContext, new
     await state.clear()
     await callback.answer()
 
-@router.callback_query(F.data.startswith("time:"), Booking.choosing_time)
-async def time_chosen(callback: CallbackQuery, state: FSMContext, bot: Bot):
-    """Обработка выбора времени и завершение записи."""
-    selected_time = ":".join(callback.data.split(":")[1:])
-    user_data = await state.get_data()
+def get_contact_keyboard() -> ReplyKeyboardMarkup:
+    """Создает клавиатуру для запроса номера телефона."""
+    builder = ReplyKeyboardBuilder()
+    builder.row(
+        KeyboardButton(text="📱 Поделиться номером телефона", request_contact=True)
+    )
+    builder.row(
+        KeyboardButton(text="Пропустить")
+    )
+    return builder.as_markup(resize_keyboard=True, one_time_keyboard=True)
 
-    # Повторная проверка доступности слота на случай, если его заняли
-    selected_date_obj = datetime.strptime(user_data.get("date"), "%d.%m.%Y").date()
-    logger.debug(f"time_chosen: Re-checking slots for date: {selected_date_obj}")
-    current_occupancy = await get_time_slots_occupancy(selected_date_obj)
-    logger.debug(f"time_chosen: User selected '{selected_time}'. Occupancy now: {current_occupancy}")
-
-    if current_occupancy.get(selected_time, 0) >= MAX_PARALLEL_BOOKINGS:
-        await callback.answer("Это время уже занято!", show_alert=True)
-        logger.warning(f"time_chosen: Slot conflict! User picked '{selected_time}', but it's already full.")
-        await callback.message.edit_text(
-            f"Извините, время <b>{selected_time}</b> только что заняли.\n\nПожалуйста, выберите другое доступное время (❌ - занято):",
-            reply_markup=get_time_slots_keyboard(
-                occupancy=current_occupancy,
-                working_hours=WORKING_HOURS,
-                max_bookings=MAX_PARALLEL_BOOKINGS
-            )
-        )
-        return
-
-    await state.update_data(time=selected_time)
+async def finalize_booking_and_notify(message: Message, state: FSMContext, bot: Bot):
+    """Общая логика для сохранения записи и отправки уведомлений."""
     user_data = await state.get_data()
 
     # 1. Расчет цены
     base_price, discount_amount, final_price = await calculate_booking_price(user_data)
 
     # 2. Сохранение в БД
-    new_booking = await _save_booking_to_db(callback.from_user, user_data, final_price, discount_amount)
+    new_booking = await _save_booking_to_db(message.from_user, user_data, final_price, discount_amount)
 
     # 3. Формируем сводку для уведомлений
     summary_text = await get_booking_summary(user_data)
 
     # 4. Отправка уведомления админу с кнопкой подтверждения
-    await _send_admin_pending_notification(bot, callback.from_user, new_booking, summary_text)
+    await _send_admin_pending_notification(bot, message.from_user, new_booking, summary_text, user_data.get("phone_number"))
 
     # 5. Отправка предварительного подтверждения пользователю
-    await callback.message.edit_text(
+    await message.answer(
         "✅ <b>Ваша заявка принята!</b>\n\n"
         "Ожидайте, с вами свяжется администратор в ближайшее время для подтверждения записи."
     )
 
     # 6. Очистка состояния
     await state.clear()
+
+@router.callback_query(F.data.startswith("time:"), Booking.choosing_time)
+async def time_chosen(callback: CallbackQuery, state: FSMContext, bot: Bot):
+    """Обработка выбора времени и переход к запросу контакта."""
+    selected_time = ":".join(callback.data.split(":")[1:])
+    user_data = await state.get_data()
+
+    # Повторная проверка доступности слота на случай, если его заняли
+    selected_date_obj = datetime.strptime(user_data.get("date"), "%d.%m.%Y").date()
+    current_occupancy = await get_time_slots_occupancy(selected_date_obj)
+
+    if current_occupancy.get(selected_time, 0) >= MAX_PARALLEL_BOOKINGS:
+        await callback.answer("Это время уже занято!", show_alert=True)
+        await callback.message.edit_text(
+            f"Извините, время <b>{selected_time}</b> только что заняли.\n\nПожалуйста, выберите другое доступное время (❌ - занято):",
+            reply_markup=get_time_slots_keyboard(occupancy=current_occupancy, working_hours=WORKING_HOURS, max_bookings=MAX_PARALLEL_BOOKINGS)
+        )
+        return
+
+    await state.update_data(time=selected_time)
+
+    # Удаляем инлайн-клавиатуру и запрашиваем контакт
+    await callback.message.delete()
+    await callback.message.answer(
+        "Отлично! Для завершения записи, пожалуйста, поделитесь вашим номером телефона. Это необходимо для связи с вами.",
+        reply_markup=get_contact_keyboard()
+    )
+    await state.set_state(Booking.requesting_contact)
     await callback.answer()
+
+@router.message(Booking.requesting_contact, F.contact)
+async def contact_shared(message: Message, state: FSMContext, bot: Bot):
+    """Обрабатывает полученный контакт и завершает запись."""
+    phone_number = message.contact.phone_number
+    await state.update_data(phone_number=phone_number)
+    await message.answer(f"Спасибо! Ваш номер <code>{phone_number}</code> получен.", reply_markup=ReplyKeyboardRemove())
+    await finalize_booking_and_notify(message, state, bot)
+
+@router.message(Booking.requesting_contact, F.text == "Пропустить")
+async def contact_skipped(message: Message, state: FSMContext, bot: Bot):
+    """Обрабатывает пропуск шага с контактом и завершает запись."""
+    await state.update_data(phone_number=None)
+    await message.answer("Хорошо, мы записали вас без номера телефона.", reply_markup=ReplyKeyboardRemove())
+    await finalize_booking_and_notify(message, state, bot)
+
+@router.message(Booking.requesting_contact)
+async def contact_wrong_input(message: Message):
+    """Ловит некорректный ввод на шаге запроса контакта."""
+    await message.answer("Пожалуйста, используйте кнопки ниже, чтобы поделиться номером или пропустить этот шаг.")
+
 # =============================================================================
 # Handlers for "Back" buttons
 # =============================================================================
