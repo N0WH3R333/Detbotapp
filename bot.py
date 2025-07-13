@@ -19,7 +19,6 @@ from config import (
 )
 from handlers import main_router
 from handlers import errors # Обработчик ошибок подключаем отдельно
-from database.force_sync import force_sync_products_from_json # <-- Импортируем нашу новую функцию
 from database.pool import get_pool, close_pool
 from database.db_setup import init_db
 from database.db import (
@@ -239,13 +238,15 @@ async def main() -> None:
 
     # Настраиваем CORS централизованно и более надежно
     if WEBAPP_URL:
-        logging.info(f"CORS is configured to allow requests from: {WEBAPP_URL}")
+        # Для отладки временно разрешаем запросы с любого источника.
+        # Это должно решить проблему с ошибкой 511, вызванной некорректным Origin.
+        logging.warning(f"CORS is configured to allow requests from ANY origin ('*') for debugging.")
         cors = aiohttp_cors.setup(app, defaults={
-            WEBAPP_URL: aiohttp_cors.ResourceOptions(
+            "*": aiohttp_cors.ResourceOptions(
                 allow_credentials=True,
                 expose_headers="*",
                 allow_headers="*",
-                allow_methods=["GET", "OPTIONS"],
+                allow_methods=["GET", "POST", "OPTIONS"],
             )
         })
         # Применяем CORS ко всем роутам в приложении

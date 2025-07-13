@@ -45,11 +45,14 @@ document.addEventListener('DOMContentLoaded', () => {
             allCategoriesData = JSON.parse(rawResponseText);
 
             // Сохраняем все товары в allProducts для быстрого доступа (для корзины и поиска)
-            allCategoriesData?.forEach(cat => {
-                cat?.subcategories?.forEach(subcat => {
-                    subcat?.products?.forEach(prod => {
-                        allProducts[prod.id] = prod;
-                    });
+            // Более надежная проверка, которая не упадет, даже если данные некорректны
+            (allCategoriesData || []).forEach(cat => {
+                (cat?.subcategories || []).forEach(subcat => {
+                    (subcat?.products || []).forEach(prod => {
+                        if (prod?.id) {
+                            allProducts[prod.id] = prod;
+                        }
+                    })
                 });
             });
             renderCategoryMenu(); // Рендерим меню категорий вместо всего каталога
@@ -82,7 +85,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const menuGrid = document.createElement('div');
         menuGrid.className = 'category-menu-grid';
 
-        if (allCategoriesData.length === 0) {
+        if (!allCategoriesData || allCategoriesData.length === 0) {
             const noItems = document.createElement('p');
             noItems.textContent = 'Разделы не найдены.';
             menuGrid.appendChild(noItems);
@@ -123,14 +126,16 @@ document.addEventListener('DOMContentLoaded', () => {
         categoryTitle.textContent = selectedCategory.name;
         categoryElement.appendChild(categoryTitle);
 
-        if (selectedCategory.subcategories.length === 0 || selectedCategory.subcategories.every(s => s.products.length === 0)) {
+        const subcategories = selectedCategory.subcategories || [];
+        if (subcategories.length === 0 || subcategories.every(s => !s?.products?.length)) {
             const noProducts = document.createElement('p');
             noProducts.className = 'info-message';
             noProducts.textContent = 'В этом разделе пока нет товаров.';
             categoryElement.appendChild(noProducts);
         } else {
-            selectedCategory.subcategories.forEach(subcategory => {
-                if (subcategory.products.length === 0) return;
+            subcategories.forEach(subcategory => {
+                const products = subcategory?.products || [];
+                if (products.length === 0) return;
 
                 const subcategoryTitle = document.createElement('h3');
                 subcategoryTitle.className = 'subcategory-title';
@@ -140,7 +145,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const productsGrid = document.createElement('div');
                 productsGrid.className = 'products-grid';
 
-                subcategory.products.forEach(product => {
+                products.forEach(product => {
                     const productCard = createProductCard(product);
                     productsGrid.appendChild(productCard);
                 });
