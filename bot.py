@@ -18,6 +18,7 @@ from config import (
 )
 from handlers import main_router
 from handlers import errors # Обработчик ошибок подключаем отдельно
+from database.force_sync import force_sync_products_from_json # <-- Импортируем нашу новую функцию
 from database.pool import get_pool, close_pool
 from database.db_setup import init_db
 from database.db import (
@@ -222,8 +223,10 @@ async def main() -> None:
     # Наполняем БД начальными данными (товары) и создаем JSON-файлы.
     # Эту строку нужно выполнять только при самой первой настройке.
     # После того как вы наполнили products.json своими товарами, ее СНОВА СЛЕДУЕТ ЗАКОММЕНТИРОВАТЬ.
-    await ensure_data_files_exist()
+    # await ensure_data_files_exist()
 
+    # ВРЕМЕННЫЙ ВЫЗОВ ДЛЯ ПРИНУДИТЕЛЬНОЙ СИНХРОНИЗАЦИИ. ПОСЛЕ УСПЕХА ЗАКОММЕНТИРОВАТЬ!
+    await force_sync_products_from_json()
     logging.info("Запуск бота...")
 
     # Инициализация бота и диспетчера
