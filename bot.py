@@ -73,10 +73,15 @@ def _create_api_response(
     data: dict | list | None,
     status: int = 200
 ) -> web.Response:
-    """Создает aiohttp.web.Response."""
-    if status == 204: # No Content
-        return web.Response(status=status)
-    return web.json_response(data, status=status)
+    """Создает aiohttp.web.Response с принудительными CORS заголовками для отладки."""
+    headers = {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    }
+    if status == 204:
+        return web.Response(status=status, headers=headers)
+    return web.json_response(data, status=status, headers=headers)
 
 async def products_api_handler(request: web.Request) -> web.Response:
     """
@@ -90,6 +95,10 @@ async def products_api_handler(request: web.Request) -> web.Response:
     # Логируем origin входящего запроса для отладки CORS
     origin = request.headers.get('Origin')
     logger.info(f"API request for products from origin: {origin}, method: {request.method}")
+
+    # Явно обрабатываем preflight-запрос OPTIONS
+    if request.method == 'OPTIONS':
+        return _create_api_response(None, status=204)
 
     logger.info("Processing GET request for products.")
     all_products = await get_all_products()
@@ -156,6 +165,10 @@ async def validate_promocode_handler(request: web.Request) -> web.Response:
     promocode = request.query.get('code', '').upper()
     origin = request.headers.get('Origin')
     logger.debug(f"API request to validate promocode '{promocode}' from origin: {origin}, method: {request.method}")
+
+    # Явно обрабатываем preflight-запрос OPTIONS
+    if request.method == 'OPTIONS':
+        return _create_api_response(None, status=204)
 
     # Guard Clause: Промокод не предоставлен или не существует
     if not promocode or promocode not in (promocodes_db := await get_all_promocodes()):
@@ -236,27 +249,7 @@ async def main() -> None:
     app.router.add_get("/api/products", products_api_handler)
     app.router.add_get("/api/validate_promocode", validate_promocode_handler)
 
-    # Настраиваем CORS централизованно и более надежно
-    if WEBAPP_URL:
-        # Для отладки временно разрешаем запросы с любого источника.
-        # Это должно решить проблему с ошибкой 511, вызванной некорректным Origin.
-        logging.warning(f"CORS is configured to allow requests from ANY origin ('*') for debugging.")
-        cors = aiohttp_cors.setup(app, defaults={
-            "*": aiohttp_cors.ResourceOptions(
-                allow_credentials=True,
-                expose_headers="*",
-                allow_headers="*",
-                allow_methods=["GET", "POST", "OPTIONS"],
-            )
-        })
-        # Применяем CORS ко всем роутам в приложении
-        for route in list(app.router.routes()):
-            cors.add(route)
-    else:
-        logging.warning(
-            "WEBAPP_URL is not set in environment variables. "
-            "CORS is not configured, which will likely cause the web app to fail."
-        )
+    # CORS заголовки теперь добавляются вручную в _create_api_response для большей надежности
     
     # Передаем экземпляр бота в диспетчер для dependency injection
     # Это позволит получать его в хэндлерах через тайп-хинтинг (bot: Bot)
