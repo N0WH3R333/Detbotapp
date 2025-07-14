@@ -5,6 +5,7 @@ from babel.dates import format_date
 
 from aiogram import F, Router, Bot, types
 from aiogram.filters.callback_data import CallbackData
+from config import ADMIN_IDS
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery
 from aiogram.exceptions import TelegramBadRequest
@@ -74,7 +75,22 @@ async def confirm_booking_by_admin(callback: types.CallbackQuery, bot: Bot):
     if promocode := confirmed_booking.get("promocode"):
         await increment_promocode_usage(promocode)
 
-    await callback.message.edit_text(f"✅ Запись #{booking_id} подтверждена. Клиент уведомлен.")
+    admin_who_confirmed = callback.from_user
+    admin_name = f"@{admin_who_confirmed.username}" if admin_who_confirmed.username else admin_who_confirmed.full_name
+    notification_text = f"✅ Запись #{booking_id} была <b>подтверждена</b> администратором {admin_name}."
+
+    # Редактируем сообщение для админа, который нажал кнопку
+    await callback.message.edit_text(f"{notification_text}\nКлиент уведомлен.")
+
+    # Отправляем уведомление остальным администраторам
+    for admin_id in ADMIN_IDS:
+        if admin_id == callback.from_user.id:
+            continue
+        try:
+            await bot.send_message(admin_id, notification_text)
+        except Exception as e:
+            logger.error(f"Не удалось отправить уведомление о подтверждении админу {admin_id}: {e}")
+
     await callback.answer("Запись подтверждена!")
 
 
@@ -108,7 +124,22 @@ async def reject_booking_by_admin(callback: types.CallbackQuery, bot: Bot):
     user_rejection_text = "❗️ <b>Ваша заявка на запись была отклонена.</b>\n\nК сожалению, мы не можем принять вашу запись в указанное время. Пожалуйста, попробуйте выбрать другое время или свяжитесь с нами для уточнения деталей."
     await bot.send_message(user_id, user_rejection_text)
 
-    await callback.message.edit_text(f"❌ Заявка #{booking_id} отклонена. Клиент уведомлен.")
+    admin_who_rejected = callback.from_user
+    admin_name = f"@{admin_who_rejected.username}" if admin_who_rejected.username else admin_who_rejected.full_name
+    notification_text = f"❌ Заявка #{booking_id} была <b>отклонена</b> администратором {admin_name}."
+
+    # Редактируем сообщение для админа, который нажал кнопку
+    await callback.message.edit_text(f"{notification_text}\nКлиент уведомлен.")
+
+    # Отправляем уведомление остальным администраторам
+    for admin_id in ADMIN_IDS:
+        if admin_id == callback.from_user.id:
+            continue
+        try:
+            await bot.send_message(admin_id, notification_text)
+        except Exception as e:
+            logger.error(f"Не удалось отправить уведомление об отклонении админу {admin_id}: {e}")
+
     await callback.answer("Заявка отклонена!")
 
 async def _get_filtered_bookings(period: str) -> tuple[list, str]:
