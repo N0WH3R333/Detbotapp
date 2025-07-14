@@ -7,6 +7,11 @@ import tempfile
 from typing import Any
 from .pool import get_pool
 
+class SlotAlreadyBookedError(Exception):
+    """Исключение для случаев, когда временной слот уже полностью забронирован."""
+    pass
+
+
 logger = logging.getLogger(__name__)
 
 DATA_DIR = "data"
@@ -372,11 +377,30 @@ async def get_user_bookings(user_id: int) -> list[dict]:
         return [await _format_booking_record(rec) for rec in records]
 
 async def add_booking_to_db(user_id: int, user_full_name: str, user_username: str | None, booking_data: dict) -> dict:
-    """Добавляет новую запись на услугу в базу данных."""
+    """
+    Добавляет новую запись на услугу в базу данных.
+    Проверяет, что на указанное время есть свободные слоты (максимум 2 записи).
+    """
     pool = await get_pool()
     async with pool.acquire() as connection:
         async with connection.transaction():
-            # 1. Убедимся, что пользователь существует и обновим его данные, включая номер телефона
+            # 1. Проверяем количество существующих записей на это же время
+            time_obj = datetime.strptime(booking_data['time'], '%H:%M').time()
+            date_str = booking_data['date']
+
+            count_sql = """
+                SELECT COUNT(*) FROM bookings
+                WHERE booking_date = TO_DATE($1, 'DD.MM.YYYY')
+                  AND booking_time = $2
+                  AND status IN ('pending_confirmation', 'confirmed');
+            """
+            count = await connection.fetchval(count_sql, date_str, time_obj)
+
+            if count >= 2:
+                logger.warning(f"Попытка записи на уже занятый слот: {date_str} {booking_data['time']} пользователем {user_id}")
+                raise SlotAlreadyBookedError(f"Слот на {date_str} {booking_data['time']} уже полностью занят.")
+
+            # 2. Убедимся, что пользователь существует и обновим его данные, включая номер телефона
             phone_number = booking_data.get("phone_number")
             await connection.execute(
                 """
@@ -390,14 +414,12 @@ async def add_booking_to_db(user_id: int, user_full_name: str, user_username: st
                 user_id, user_full_name, user_username, phone_number
             )
 
-            # 2. Добавляем основную запись
+            # 3. Добавляем основную запись
             booking_sql = """
                 INSERT INTO bookings (user_id, service_name, booking_date, booking_time, price_rub, discount_rub, promocode, details_json)
                 VALUES ($1, $2, TO_DATE($3, 'DD.MM.YYYY'), $4, $5, $6, $7, $8)
                 RETURNING booking_id;
             """
-            # PostgreSQL ожидает объект time, а не строку. Конвертируем.
-            time_obj = datetime.strptime(booking_data['time'], '%H:%M').time()
 
             booking_id = await connection.fetchval(
                 booking_sql, user_id, booking_data['service'], booking_data['date'], time_obj,
@@ -405,7 +427,7 @@ async def add_booking_to_db(user_id: int, user_full_name: str, user_username: st
                 booking_data.get('promocode'), json.dumps(booking_data.get('details', {}))
             )
 
-            # 3. Добавляем медиафайлы, если они есть
+            # 4. Добавляем медиафайлы, если они есть
             media_files = booking_data.get('media_files', [])
             if media_files:
                 media_sql = "INSERT INTO booking_media (booking_id, file_id, file_type) VALUES ($1, $2, $3);"
@@ -796,7 +818,7 @@ async def delete_candidate_in_db(candidate_id: int) -> dict | None:
         logger.info(f"Candidate {candidate_id} was deleted by admin.")
         return {**deleted_record, 'id': deleted_record['candidate_id']}
     else:
-        logger.warning(f"Admin tried to edit non-existent order #{order_id}")
+        logger.warning(f"Admin tried to delete non-existent candidate #{candidate_id}.")
         return None
 
 async def get_blocked_users() -> list[int]:
