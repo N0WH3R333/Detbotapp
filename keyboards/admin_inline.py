@@ -89,6 +89,21 @@ def get_admin_management_keyboard() -> InlineKeyboardMarkup:
     builder.adjust(1)
     return builder.as_markup()
 
+def get_admins_list_keyboard(admins: list[dict]) -> InlineKeyboardMarkup:
+    """Клавиатура для списка администраторов с кнопками удаления."""
+    builder = InlineKeyboardBuilder()
+    for admin in admins:
+        # Не даем удалить супер-администратора
+        if admin.get('user_id') != SUPER_ADMIN_ID:
+            builder.button(
+                text=f"🗑️ Удалить {admin.get('full_name', admin.get('user_id'))}",
+                callback_data=f"admin_remove_admin_{admin.get('user_id')}"
+            )
+    builder.adjust(1)
+    builder.row(InlineKeyboardButton(text="⬅️ Назад в управление", callback_data="admin_manage_admins"))
+    return builder.as_markup()
+
+
 def get_promocode_management_keyboard():
     builder = InlineKeyboardBuilder()
     builder.button(text="➕ Добавить промокод", callback_data="admin_add_promocode_start")

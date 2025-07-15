@@ -28,7 +28,7 @@ async def manage_admins_menu(callback: CallbackQuery):
     await callback.answer()
 
 
-@router.callback_query(F.data == "admin_list_admins")
+@router.callback_query(F.data == "admin_remove_admin_start")
 async def list_admins(callback: CallbackQuery):
     """Показывает список администраторов с кнопками для удаления."""
     admins = await get_admin_list()
