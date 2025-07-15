@@ -17,7 +17,7 @@ from keyboards.booking_keyboards import (
 )
 from database.db import (
     add_booking_to_db, get_all_prices, get_blocked_dates, get_all_promocodes,
-    increment_promocode_usage, get_bookings_for_occupancy)
+    increment_promocode_usage, get_bookings_for_occupancy, update_booking_status)
 from utils.scheduler import schedule_reminder
 from utils.constants import ALL_NAMES, WORKING_HOURS
 from config import ADMIN_IDS, MAX_PARALLEL_BOOKINGS
@@ -574,7 +574,7 @@ async def finalize_booking_and_notify(message: Message, state: FSMContext, bot: 
 
     # --- ВРЕМЕННАЯ ПРОВЕРКА/ИСПРАВЛЕНИЕ СТАТУСА ---
     # (Потенциально решает проблему мгновенного подтверждения)
-    await db.update_booking_status(new_booking['id'], 'pending_confirmation')
+    await update_booking_status(new_booking['id'], 'pending_confirmation')
     logger.info(f"TEMPORARY FIX: Ensured booking #{new_booking['id']} is in 'pending_confirmation' status.")
 
     # 6. Очистка состояния
@@ -599,7 +599,7 @@ async def time_chosen(callback: CallbackQuery, state: FSMContext, bot: Bot):
         return
 
     await state.update_data(time=selected_time)
-
+    # Похоже здесь пропущено, что нужно ответить пользователю о выборе времени.
     # Удаляем инлайн-клавиатуру и запрашиваем контакт
     await callback.message.delete()
     await callback.message.answer(
