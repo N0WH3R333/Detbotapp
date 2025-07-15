@@ -3,6 +3,7 @@ from aiogram import Router, F, Bot
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 from aiogram.types import Message, CallbackQuery
+from aiogram.filters import StateFilter
 
 from keyboards.admin_inline import get_broadcast_options_keyboard, get_back_to_menu_keyboard, get_button_markup
 from utils.broadcast import send_broadcast
@@ -107,7 +108,7 @@ async def get_button_callback(message: Message, state: FSMContext, bot: Bot):
     await message.answer("Что делаем дальше?", reply_markup=get_broadcast_options_keyboard())
 
 
-@router.callback_query(F.data == "broadcast_cancel", BroadcastStates.any)
+@router.callback_query(F.data == "broadcast_cancel", StateFilter(BroadcastStates))
 async def cancel_process(callback: CallbackQuery, state: FSMContext):
     await state.clear()
     await callback.message.edit_text("Рассылка отменена.")
