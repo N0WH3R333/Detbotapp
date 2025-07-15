@@ -4,7 +4,9 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from database.db import get_product_by_id
 from utils.constants import ALL_NAMES
 from config import SUPER_ADMIN_ID
-
+from aiogram.utils.keyboard import InlineKeyboardBuilder
+from config import SUPER_ADMIN_ID
+from typing import Dict, Optional
 
 class AdminOrdersPaginator(CallbackData, prefix="admin_order_page"):
     action: str
@@ -342,4 +344,29 @@ def get_candidates_list_keyboard(candidates_on_page: list, page: int, total_page
         builder.row(*pagination_row)
 
     builder.row(InlineKeyboardButton(text="⬅️ Назад в меню", callback_data="admin_back_to_main"))
+    return builder.as_markup()
+
+
+def get_broadcast_options_keyboard() -> InlineKeyboardMarkup:
+    """Клавиатура с опциями для создаваемой рассылки."""
+    builder = InlineKeyboardBuilder()
+    builder.button(text="🚀 Отправить", callback_data="broadcast_send")
+    builder.button(text="➕ Добавить/изменить кнопку", callback_data="broadcast_add_button")
+    builder.button(text="❌ Отменить рассылку", callback_data="broadcast_cancel")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def get_button_markup(button_data: Optional[Dict[str, str]]) -> Optional[InlineKeyboardMarkup]:
+    """
+    Создает клавиатуру с одной кнопкой на основе предоставленных данных.
+
+    :param button_data: Словарь с ключами 'text' и 'callback_data'.
+    :return: Объект InlineKeyboardMarkup или None, если данные не предоставлены.
+    """
+    if not button_data or not button_data.get("text") or not button_data.get("callback_data"):
+        return None
+
+    builder = InlineKeyboardBuilder()
+    builder.button(text=button_data["text"], callback_data=button_data["callback_data"])
     return builder.as_markup()

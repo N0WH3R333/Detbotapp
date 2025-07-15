@@ -25,3 +25,5 @@ class AdminStates(StatesGroup):
     entering_new_client_name = State()
     # Candidate management
     viewing_candidate = State()
+    # Admin management
+    entering_add_admin_id = State()

@@ -146,7 +146,10 @@ async def products_api_handler(request: web.Request) -> web.Response:
         response_data.append({"name": cat_name, "subcategories": subcategories_list})
 
     # Логируем итоговый результат перед отправкой
-    logger.info(f"Sending catalog data to frontend. Total categories: {len(response_data)}.")
+    num_categories = len(response_data)
+    num_subcategories = sum(len(cat["subcategories"]) for cat in response_data)
+    logger.info(f"Sending catalog data to frontend. "
+                f"Total categories: {num_categories}, total subcategories: {num_subcategories}.")
 
     return _create_api_response(response_data)
 
@@ -191,6 +194,7 @@ async def validate_promocode_handler(request: web.Request) -> web.Response:
         return _create_api_response({"valid": False, "reason": "invalid_format"})
 
 async def main() -> None:
+    # Тестовый комментарий для проверки отображения diff
     setup_logging()
 
     # Проверяем наличие DATABASE_URL перед тем, как делать что-либо еще
@@ -201,7 +205,7 @@ async def main() -> None:
     # Создаем пул соединений при старте с обработкой возможных ошибок
     try:
         await get_pool()
-    except (OSError, asyncpg.exceptions.PostgresConnectionError) as e:
+    except (OSError, asyncpg.exceptions.PostgresError) as e:
         # Ловим распространенные ошибки подключения:
         # OSError (включая socket.gaierror): неверный хост/адрес, проблемы с DNS
         # PostgresConnectionError: общая ошибка подключения, включая отказ в соединении, проблемы с аутентификацией и т.д.

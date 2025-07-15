@@ -1,80 +1,114 @@
-import asyncio
 import logging
-
-from aiogram import F, Router, Bot
+from aiogram import Router, F, Bot
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
-from aiogram.types import CallbackQuery, Message
+from aiogram.types import Message, CallbackQuery
 
-from database.db import get_all_unique_user_ids
-from keyboards.admin_inline import get_back_to_menu_keyboard, get_broadcast_confirmation_keyboard, get_admin_keyboard
+from keyboards.admin_inline import get_broadcast_options_keyboard, get_back_to_menu_keyboard, get_button_markup
+from utils.broadcast import send_broadcast
 
 logger = logging.getLogger(__name__)
 router = Router()
 
+# TODO: Добавьте фильтр, если рассылку могут делать не все админы, а например, только SUPER_ADMIN
+# from middlewares.admin_filter import IsSuperAdmin
+# router.message.filter(IsSuperAdmin())
+# router.callback_query.filter(IsSuperAdmin())
 
 class BroadcastStates(StatesGroup):
-    entering_broadcast_message = State()
-    confirming_broadcast = State()
+    getting_message = State()
+    confirmation = State()
+    getting_button_text = State()
+    getting_button_callback = State()
 
 
 @router.callback_query(F.data == "admin_broadcast")
 async def start_broadcast(callback: CallbackQuery, state: FSMContext):
     """Начинает процесс создания рассылки."""
-    await state.set_state(BroadcastStates.entering_broadcast_message)
+    await state.clear()
+    await state.set_state(BroadcastStates.getting_message)
     await callback.message.edit_text(
-        "Перешлите или отправьте сообщение, которое вы хотите разослать всем пользователям.",
+        "Отправьте или перешлите сюда сообщение, которое вы хотите разослать всем пользователям.",
         reply_markup=get_back_to_menu_keyboard("admin_back_to_main")
     )
     await callback.answer()
 
 
-@router.message(BroadcastStates.entering_broadcast_message)
-async def broadcast_message_received(message: Message, state: FSMContext):
-    """Получает сообщение (любого типа) для рассылки и просит подтверждения."""
-    await state.update_data(broadcast_chat_id=message.chat.id, broadcast_message_id=message.message_id)
-    await message.answer(
-        "Вы уверены, что хотите отправить это сообщение всем пользователям?",
-        reply_markup=get_broadcast_confirmation_keyboard()
+@router.message(BroadcastStates.getting_message)
+async def get_broadcast_message(message: Message, state: FSMContext, bot: Bot):
+    """Получает сообщение для рассылки и показывает предпросмотр."""
+    await state.update_data(
+        message_id=message.message_id,
+        from_chat_id=message.chat.id,
+        button=None
     )
-    await state.set_state(BroadcastStates.confirming_broadcast)
+    
+    await message.answer("Вот так будет выглядеть ваше сообщение для рассылки:")
+    await bot.copy_message(chat_id=message.chat.id, from_chat_id=message.chat.id, message_id=message.message_id)
+
+    await state.set_state(BroadcastStates.confirmation)
+    await message.answer(
+        "Что делаем дальше?",
+        reply_markup=get_broadcast_options_keyboard()
+    )
 
 
-@router.callback_query(BroadcastStates.confirming_broadcast, F.data == "admin_broadcast_confirm")
-async def confirm_broadcast(callback: CallbackQuery, state: FSMContext, bot: Bot):
-    """Подтверждает и запускает рассылку."""
+@router.callback_query(F.data == "broadcast_send", BroadcastStates.confirmation)
+async def confirm_and_send(callback: CallbackQuery, state: FSMContext, bot: Bot):
     data = await state.get_data()
-    chat_id = data.get('broadcast_chat_id')
-    message_id = data.get('broadcast_message_id')
     await state.clear()
 
-    if not chat_id or not message_id:
-        await callback.message.edit_text("Произошла ошибка, данные для рассылки утеряны. Попробуйте снова.", reply_markup=get_admin_keyboard())
-        return
-
-    user_ids = await get_all_unique_user_ids()
-    if not user_ids:
-        await callback.message.edit_text("Не найдено ни одного пользователя для рассылки.", reply_markup=get_admin_keyboard())
-        return
-
-    await callback.message.edit_text(f"Начинаю рассылку для {len(user_ids)} пользователей...")
-    success_count, fail_count = 0, 0
-    for user_id in user_ids:
-        try:
-            await bot.copy_message(chat_id=user_id, from_chat_id=chat_id, message_id=message_id)
-            success_count += 1
-        except Exception as e:
-            fail_count += 1
-            logger.error(f"Failed to send broadcast message to {user_id}. Error: {e}")
-        await asyncio.sleep(0.1)
-
-    report_text = f"✅ <b>Рассылка завершена!</b>\n\nУспешно отправлено: {success_count}\nНе удалось отправить: {fail_count}"
-    await callback.message.edit_text(report_text, reply_markup=get_admin_keyboard())
+    await callback.message.edit_text("⏳ Начинаю рассылку... Это может занять некоторое время.")
+    
+    successful, failed = await send_broadcast(bot=bot, content=data)
+    
+    await callback.message.answer(
+        f"✅ Рассылка завершена!\n\n"
+        f"📬 Успешно отправлено: {successful}\n"
+        f"❌ Не удалось отправить: {failed}"
+    )
+    await callback.answer()
 
 
-@router.callback_query(F.data == "admin_broadcast_cancel", BroadcastStates.confirming_broadcast)
-async def cancel_broadcast(callback: CallbackQuery, state: FSMContext):
-    """Отменяет рассылку."""
+@router.callback_query(F.data == "broadcast_add_button", BroadcastStates.confirmation)
+async def add_button_start(callback: CallbackQuery, state: FSMContext):
+    await state.set_state(BroadcastStates.getting_button_text)
+    await callback.message.edit_text(
+        "Введите текст для кнопки.",
+        reply_markup=get_back_to_menu_keyboard("broadcast_cancel") # Общая отмена
+    )
+    await callback.answer()
+
+
+@router.message(BroadcastStates.getting_button_text)
+async def get_button_text(message: Message, state: FSMContext):
+    await state.update_data(button_text=message.text)
+    await state.set_state(BroadcastStates.getting_button_callback)
+    await message.answer(
+        "Отлично. Теперь введите callback-данные для кнопки (латинские буквы, цифры, _). "
+        "Это уникальный идентификатор, который будет срабатывать при нажатии.",
+        reply_markup=get_back_to_menu_keyboard("broadcast_cancel")
+    )
+
+
+@router.message(BroadcastStates.getting_button_callback)
+async def get_button_callback(message: Message, state: FSMContext, bot: Bot):
+    data = await state.get_data()
+    button_data = {"text": data['button_text'], "callback_data": message.text}
+    await state.update_data(button=button_data)
+    
+    await message.answer("Кнопка добавлена! Вот обновленный предпросмотр:")
+    await bot.copy_message(
+        chat_id=message.chat.id, from_chat_id=data['from_chat_id'],
+        message_id=data['message_id'], reply_markup=get_button_markup(button_data)
+    )
+
+    await state.set_state(BroadcastStates.confirmation)
+    await message.answer("Что делаем дальше?", reply_markup=get_broadcast_options_keyboard())
+
+
+@router.callback_query(F.data == "broadcast_cancel", BroadcastStates.any)
+async def cancel_process(callback: CallbackQuery, state: FSMContext):
     await state.clear()
-    await callback.message.edit_text("Рассылка отменена.", reply_markup=get_admin_keyboard())
+    await callback.message.edit_text("Рассылка отменена.")
     await callback.answer()

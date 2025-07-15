@@ -572,10 +572,11 @@ async def finalize_booking_and_notify(message: Message, state: FSMContext, bot: 
         "Ожидайте, с вами свяжется администратор в ближайшее время для подтверждения записи."
     )
 
-    # --- ВРЕМЕННАЯ ПРОВЕРКА/ИСПРАВЛЕНИЕ СТАТУСА ---
-    # (Потенциально решает проблему мгновенного подтверждения)
+    # Окончательно устанавливаем статус "ожидает подтверждения" на случай,
+    # если другие процессы (например, старая версия бота) могли его изменить.
+    # Это гарантирует, что кнопки подтверждения/отклонения для админа будут работать корректно.
     await update_booking_status(new_booking['id'], 'pending_confirmation')
-    logger.info(f"TEMPORARY FIX: Ensured booking #{new_booking['id']} is in 'pending_confirmation' status.")
+    logger.debug(f"Ensured booking #{new_booking['id']} has 'pending_confirmation' status before finishing.")
 
     # 6. Очистка состояния
     await state.clear()

@@ -18,12 +18,12 @@ async def init_db():
             # Дополнительная проверка и обновление ENUM типа для обратной совместимости
             # Это необходимо, если база уже была создана со старым набором статусов.
             await connection.execute("""
-                DO $$
-                BEGIN
-                    IF NOT EXISTS (SELECT 1 FROM pg_enum WHERE enumlabel = 'pending_confirmation' AND enumtypid = (SELECT oid FROM pg_type WHERE typname = 'booking_status')) THEN
-                        ALTER TYPE booking_status ADD VALUE 'pending_confirmation' BEFORE 'confirmed';
-                    END IF;
-                END$$;
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_enum WHERE enumlabel = 'pending_confirmation' AND enumtypid = (SELECT oid FROM pg_type WHERE typname = 'booking_status')) THEN
+        ALTER TYPE booking_status ADD VALUE 'pending_confirmation' BEFORE 'confirmed';
+    END IF;
+END$$;
             """)
         except Exception as e:
             logger.critical(f"Не удалось инициализировать схему базы данных: {e}")

@@ -171,7 +171,37 @@ async def _seed_initial_products():
                     )
         logger.info("Начальные данные для товаров успешно загружены в базу данных.")
 
+async def add_admin(user_id: int) -> bool:
+    """Делает пользователя администратором."""
+    pool = await get_pool()
+    # Сначала убедимся, что пользователь существует в таблице users.
+    # Если нет, мы не можем сделать его админом.
+    async with pool.acquire() as connection:
+        user_exists = await connection.fetchval("SELECT 1 FROM users WHERE user_id = $1", user_id)
+        if not user_exists:
+            logger.warning(f"Попытка добавить в админы несуществующего пользователя с ID {user_id}")
+            return False
 
+        await connection.execute("UPDATE users SET is_admin = TRUE WHERE user_id = $1", user_id)
+        logger.info(f"Пользователь {user_id} назначен администратором.")
+        return True
+
+
+async def remove_admin(user_id: int) -> bool:
+    """Убирает права администратора у пользователя."""
+    pool = await get_pool()
+    result = await pool.execute("UPDATE users SET is_admin = FALSE WHERE user_id = $1", user_id)
+    if result == "UPDATE 1":
+        logger.info(f"Пользователь {user_id} лишен прав администратора.")
+        return True
+    return False
+
+
+async def get_admin_list() -> list[dict]:
+    """Возвращает список всех администраторов из БД."""
+    pool = await get_pool()
+    records = await pool.fetch("SELECT user_id, full_name, username FROM users WHERE is_admin = TRUE")
+    return [dict(rec) for rec in records]
 
 # --- Функции для работы с товарами и промокодами ---
 
