@@ -2,6 +2,7 @@ import asyncio
 import logging
 import os
 from logging.handlers import RotatingFileHandler
+import asyncpg
 
 from datetime import datetime
 from aiogram import Bot, Dispatcher, F
@@ -197,8 +198,16 @@ async def main() -> None:
         logging.critical("Переменная DATABASE_URL не установлена. Бот не может запуститься без подключения к базе данных.")
         return
 
-    # Создаем пул соединений при старте
-    await get_pool()
+    # Создаем пул соединений при старте с обработкой возможных ошибок
+    try:
+        await get_pool()
+    except (OSError, asyncpg.exceptions.PostgresConnectionError) as e:
+        # Ловим распространенные ошибки подключения:
+        # OSError (включая socket.gaierror): неверный хост/адрес, проблемы с DNS
+        # PostgresConnectionError: общая ошибка подключения, включая отказ в соединении, проблемы с аутентификацией и т.д.
+        logging.critical(f"Не удалось подключиться к базе данных: {e}")
+        logging.critical("Пожалуйста, проверьте правильность DATABASE_URL и доступность сервера базы данных.")
+        return
 
     # Инициализируем таблицы в базе данных
     await init_db()
