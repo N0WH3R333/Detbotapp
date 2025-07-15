@@ -38,6 +38,12 @@ if ADMIN_ID_STR:
 # ID главного администратора с особыми правами
 SUPER_ADMIN_ID = _get_env_var("SUPER_ADMIN_ID", None, int)
 
+# Улучшение: Автоматически добавляем SUPER_ADMIN_ID в список обычных админов,
+# если он задан и его еще нет в списке. Это упрощает настройку.
+if SUPER_ADMIN_ID and SUPER_ADMIN_ID not in ADMIN_IDS:
+    ADMIN_IDS.append(SUPER_ADMIN_ID)
+    logger.info(f"SUPER_ADMIN_ID ({SUPER_ADMIN_ID}) был автоматически добавлен в список администраторов.")
+
 LOG_LEVEL = _get_env_var("LOG_LEVEL", "INFO").upper()
 LOG_LEVEL_HANDLERS = _get_env_var("LOG_LEVEL_HANDLERS", "INFO").upper()
 LOG_LEVEL_AIOGRAM = _get_env_var("LOG_LEVEL_AIOGRAM", "INFO").upper()
