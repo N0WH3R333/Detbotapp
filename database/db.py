@@ -203,6 +203,24 @@ async def get_admin_list() -> list[dict]:
     records = await pool.fetch("SELECT user_id, full_name, username FROM users WHERE is_admin = TRUE")
     return [dict(rec) for rec in records]
 
+
+async def get_user_ids_by_phone_numbers(phone_numbers: list[str]) -> dict[str, int]:
+    """
+    Находит user_id для предоставленного списка номеров телефонов, игнорируя нецифровые символы.
+    Возвращает словарь { 'номер_телефона_из_бд': user_id }.
+    Номера, не найденные в БД, не включаются в результат.
+    """
+    if not phone_numbers:
+        return {}
+
+    pool = await get_pool()
+    # Ищем по номерам, очищенным от всего, кроме цифр.
+    # Это позволяет находить совпадения вне зависимости от формата (+7, 8, скобки, тире).
+    sql = "SELECT phone_number, user_id FROM users WHERE regexp_replace(phone_number, '\\D', '', 'g') = ANY($1::text[]);"
+    async with pool.acquire() as connection:
+        records = await connection.fetch(sql, phone_numbers)
+        # Возвращаем оригинальный номер из БД и ID
+        return {rec['phone_number']: rec['user_id'] for rec in records}
 # --- Функции для работы с товарами и промокодами ---
 
 async def get_all_products() -> list[dict]:

@@ -51,7 +51,7 @@ async def list_admins(callback: CallbackQuery):
     await callback.answer()
 
 
-@router.callback_query(F.data == "admin_add_admin")
+@router.callback_query(F.data == "admin_add_admin_start")
 async def add_admin_start(callback: CallbackQuery, state: FSMContext):
     """Начинает процесс добавления нового администратора."""
     await state.set_state(AdminStates.entering_add_admin_id)

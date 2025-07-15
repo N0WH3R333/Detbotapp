@@ -18,6 +18,7 @@ from . import promocodes
 from . import broadcast
 from . import candidates
 from . import info_cmds
+from . import targeted_broadcast
 from . import administration
 
 admin_router.include_router(base.router)
@@ -30,6 +31,7 @@ admin_router.include_router(promocodes.router)
 admin_router.include_router(broadcast.router)
 admin_router.include_router(candidates.router)
 admin_router.include_router(info_cmds.router)
+admin_router.include_router(targeted_broadcast.router)
 admin_router.include_router(administration.router)
 
 if ADMIN_IDS:

@@ -11,15 +11,15 @@ from keyboards.admin_inline import get_button_markup
 logger = logging.getLogger(__name__)
 
 
-async def send_broadcast(bot: Bot, content: Dict[str, Any]) -> tuple[int, int]:
+async def send_broadcast(bot: Bot, user_ids: list[int], content: Dict[str, Any]) -> tuple[int, int]:
     """
-    Выполняет рассылку сообщения всем уникальным пользователям.
+    Выполняет рассылку сообщения указанным пользователям.
 
     :param bot: Экземпляр aiogram.Bot.
+    :param user_ids: Список ID пользователей для рассылки.
     :param content: Словарь, описывающий сообщение (message_id, from_chat_id, button).
     :return: Кортеж (успешно отправлено, не удалось отправить).
     """
-    user_ids = await get_all_unique_user_ids()
     if not user_ids:
         logger.info("Рассылка: нет пользователей для отправки.")
         return 0, 0

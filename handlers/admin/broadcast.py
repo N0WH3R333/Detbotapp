@@ -7,6 +7,7 @@ from aiogram.filters import StateFilter
 
 from keyboards.admin_inline import get_broadcast_options_keyboard, get_back_to_menu_keyboard, get_button_markup
 from utils.broadcast import send_broadcast
+from database.db import get_all_unique_user_ids
 
 logger = logging.getLogger(__name__)
 router = Router()
@@ -61,7 +62,9 @@ async def confirm_and_send(callback: CallbackQuery, state: FSMContext, bot: Bot)
 
     await callback.message.edit_text("⏳ Начинаю рассылку... Это может занять некоторое время.")
     
-    successful, failed = await send_broadcast(bot=bot, content=data)
+    # Получаем ID всех пользователей для массовой рассылки
+    user_ids = await get_all_unique_user_ids()
+    successful, failed = await send_broadcast(bot=bot, user_ids=list(user_ids), content=data)
     
     await callback.message.answer(
         f"✅ Рассылка завершена!\n\n"
