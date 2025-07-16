@@ -254,19 +254,19 @@ async def main() -> None:
     # Настраиваем CORS централизованно и более надежно
     if WEBAPP_URL:
         # Для отладки временно разрешаем запросы с любого источника.
-        # Это должно решить проблему с ошибкой 511, вызванной некорректным Origin.
-        logging.warning(f"CORS is configured to allow requests from ANY origin ('*') for debugging.")
+        logging.info(f"CORS is configured to allow requests from: {WEBAPP_URL}")
         cors = aiohttp_cors.setup(app, defaults={
-            "*": aiohttp_cors.ResourceOptions(
+            WEBAPP_URL: aiohttp_cors.ResourceOptions(
                 allow_credentials=True,
                 expose_headers="*",
                 allow_headers="*",
                 allow_methods=["GET", "POST", "OPTIONS"],
             )
         })
-        # Применяем CORS ко всем роутам в приложении
+         # Применяем CORS ко всем роутам в приложении
         for route in list(app.router.routes()):
             cors.add(route)
+
     else:
         logging.warning(
             "WEBAPP_URL is not set in environment variables. "
