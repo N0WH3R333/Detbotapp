@@ -2,7 +2,7 @@
   {
     "id": "EMIK",
     "name": "Эмульсионный шампунь для первой фазы мойки",
-    "price": 1,
+    "price": 750,
     "category": "продукция SEVEN",
     "subcategory": "Основное",
     "image_url": "https://i.postimg.cc/FsfrgLXv/IMG-6709.jpg",
@@ -16,7 +16,7 @@
   {
     "id": "FOMIK",
     "name": "Высокопенный шампунь для первой фазы мойки FOMIK",
-    "price": 1,
+    "price": 750,
     "category": "продукция SEVEN",
     "subcategory": "Основное",
     "image_url": "https://i.postimg.cc/3J6gnmyF/IMG-6735.jpg",
@@ -30,7 +30,7 @@
   {
     "id": "ACID_FASE",
     "name": "Кислотный шампунь для второй фазы мойки ACID FASE",
-    "price": 7888850,
+    "price": 750,
     "category": "продукция SEVEN",
     "subcategory": "Основное",
     "image_url": "https://i.postimg.cc/JnV8q6mC/IMG-6756.jpg",

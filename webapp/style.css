@@ -8,10 +8,27 @@
 }
 
 body {
+    /* --- НАЧАЛО: Код для нового фона --- */
+
+    /* 1. Указываем путь к вашему изображению. */
+    /* Убедитесь, что имя файла (backkground) и его расширение (.jpg, .png) верны. */
+    /* Путь ../photo/ означает, что папка photo находится на одном уровне с папкой, где лежит этот css файл. */
+    background-image: url('../photo/backkground.jpg');
+
+    /* 2. Растягиваем изображение на весь экран с сохранением пропорций. */
+    background-size: cover;
+
+    /* 3. Фиксируем фон. Это самый важный пункт, чтобы фон не двигался при прокрутке. */
+    background-attachment: fixed;
+
+    /* 4. Центрируем изображение. */
+    background-position: center center;
+    /* --- КОНЕЦ: Кода для нового фона --- */
+
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
     margin: 0;
     padding: 10px;
-    background-color: var(--tg-theme-bg-color);
+    background-color: var(--tg-theme-bg-color); /* Этот цвет будет виден, пока картинка загружается */
     color: var(--tg-theme-text-color);
 }
 

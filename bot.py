@@ -202,16 +202,28 @@ async def main() -> None:
         logging.critical("Переменная DATABASE_URL не установлена. Бот не может запуститься без подключения к базе данных.")
         return
 
-    # Создаем пул соединений при старте с обработкой возможных ошибок
-    try:
-        await get_pool()
-    except (OSError, asyncpg.exceptions.PostgresError) as e:
-        # Ловим распространенные ошибки подключения:
-        # OSError (включая socket.gaierror): неверный хост/адрес, проблемы с DNS
-        # PostgresConnectionError: общая ошибка подключения, включая отказ в соединении, проблемы с аутентификацией и т.д.
-        logging.critical(f"Не удалось подключиться к базе данных: {e}")
-        logging.critical("Пожалуйста, проверьте правильность DATABASE_URL и доступность сервера базы данных.")
-        return
+    # Создаем пул соединений с механизмом повторных попыток
+    max_retries = 5
+    retry_delay_base = 2  # seconds
+
+    for attempt in range(1, max_retries + 1):
+        try:
+            await get_pool()
+            logging.info("Подключение к базе данных успешно установлено.")
+            break  # Выходим из цикла, если подключение успешно
+        except (OSError, asyncpg.exceptions.PostgresError) as e:
+            if attempt < max_retries:
+                # Экспоненциальная задержка: 2, 4, 8, 16 секунд
+                wait_time = retry_delay_base ** attempt
+                logging.warning(
+                    f"Попытка подключения к базе данных #{attempt} не удалась: {e}. "
+                    f"Повторная попытка через {wait_time} секунд."
+                )
+                await asyncio.sleep(wait_time)
+            else:
+                logging.critical(f"Не удалось подключиться к БД после {max_retries} попыток: {e}")
+                logging.critical("Проверьте DATABASE_URL и доступность сервера. Бот прекращает работу.")
+                return  # Выход из main(), если все попытки провалились
 
     # Инициализируем таблицы в базе данных
     await init_db()
