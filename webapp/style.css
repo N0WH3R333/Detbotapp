@@ -220,12 +220,14 @@ body {
 /* --- Устанавливаем фон для КАЖДОЙ кнопки --- */
 /* ПЕРВАЯ кнопка в списке (предположительно "продукция SEVEN") */
 .category-menu-button:nth-child(1) {
-    background-image: linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.4)), url('images/seven-bg.jpg'); /* <<< ЗАМЕНИТЕ НА ВАШ ФАЙЛ */
+    /* Убедитесь, что расширение файла (.jpg, .png и т.д.) указано верно! */
+    background-image: linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.4)), url('images/seven.jpg');
 }
 
 /* ВТОРАЯ кнопка в списке (предположительно "Автоаксессуары") */
 .category-menu-button:nth-child(2) {
-    background-image: linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.4)), url('images/accessories-bg.jpg'); /* <<< ЗАМЕНИТЕ НА ВАШ ФАЙЛ */
+    /* Убедитесь, что расширение файла (.jpg, .png и т.д.) указано верно! */
+    background-image: linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.4)), url('images/accessories.jpg');
 }
 
 /* Кнопка "Назад" */
