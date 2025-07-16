@@ -218,16 +218,14 @@ body {
 }
 
 /* --- Устанавливаем фон для КАЖДОЙ кнопки --- */
-/* ПЕРВАЯ кнопка в списке (предположительно "продукция SEVEN") */
+/* ПЕРВАЯ кнопка в списке ("Автоаксессуары" из-за алфавитной сортировки) */
 .category-menu-button:nth-child(1) {
-    /* Убедитесь, что расширение файла (.jpg, .png и т.д.) указано верно! */
-    background-image: linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.4)), url('images/seven.jpg');
+    background-image: linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.4)), url('images/accessories.jpg');
 }
 
-/* ВТОРАЯ кнопка в списке (предположительно "Автоаксессуары") */
+/* ВТОРАЯ кнопка в списке ("продукция SEVEN") */
 .category-menu-button:nth-child(2) {
-    /* Убедитесь, что расширение файла (.jpg, .png и т.д.) указано верно! */
-    background-image: linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.4)), url('images/accessories.jpg');
+    background-image: linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.4)), url('images/seven.jpeg');
 }
 
 /* Кнопка "Назад" */
