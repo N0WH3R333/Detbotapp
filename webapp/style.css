@@ -13,7 +13,7 @@ body {
     /* 1. Указываем путь к вашему изображению. */
     /* Убедитесь, что имя файла (backkground) и его расширение (.jpg, .png) верны. */
     /* Путь ../photo/ означает, что папка photo находится на одном уровне с папкой, где лежит этот css файл. */
-    background-image: url('../photo/backkground.jpg');
+    background-image: url('images/background.jpg');
 
     /* 2. Растягиваем изображение на весь экран с сохранением пропорций. */
     background-size: cover;
